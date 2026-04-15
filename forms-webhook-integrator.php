@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Forms Webhook Integrator
  * Description: Integrates Elementor and other form submissions via an action hook with a configurable webhook endpoint, with admin settings and analytics.
- * Version:     1.1.2
+ * Version:     1.1.3
  * Requires PHP: 8.1
  * Author:      Chris Paschall
  * License:     GPL-2.0-or-later
@@ -36,7 +36,7 @@ if (version_compare(PHP_VERSION, '8.1', '<')) {
  */
 } else {
 
-    define('FWI_VERSION', '1.1.2');
+    define('FWI_VERSION', '1.1.3');
     define('FWI_PLUGIN_FILE', __FILE__);
     define('FWI_PLUGIN_DIR', plugin_dir_path(__FILE__));
     define('FWI_PLUGIN_URL', plugin_dir_url(__FILE__));
