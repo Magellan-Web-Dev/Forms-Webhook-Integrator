@@ -22,11 +22,12 @@ if (!defined('ABSPATH')) exit;
  *
  * Folder integrity:
  *  GitHub archives are extracted into a version-stamped folder by default
- *  (e.g. Forms-Webhook-Integrator-1.2.3/).  The primary fix is the
- *  upgrader_source_selection filter, which renames the extracted temp directory
- *  to the canonical name before WordPress moves it into wp-content/plugins/.
- *  Two additional filters (upgrader_post_install and a boot-time scan) act as
- *  safety nets in case something still goes wrong.
+ *  (e.g. Forms-Webhook-Integrator-1.2.3/).  The upgrader_post_install filter
+ *  (priority 10) moves the installed directory to the canonical name after a
+ *  successful install, before WordPress's own reactivate_plugin_after_upgrade
+ *  runs at priority 15 — so the plugin file is at the correct path by the time
+ *  WordPress tries to reactivate it.  A boot-time scan acts as a safety net for
+ *  any folder that slipped through a previous update.
  */
 final class GitHubUpdater
 {
@@ -66,11 +67,9 @@ final class GitHubUpdater
         add_filter('pre_set_site_transient_update_plugins', [self::class, 'check_for_update']);
         add_filter('plugins_api',                           [self::class, 'plugins_api'], 10, 3);
 
-        // Primary folder-name fix: rename the extracted temp directory before
-        // WordPress moves it into wp-content/plugins/.
-        add_filter('upgrader_source_selection', [self::class, 'fix_source_folder'], 10, 4);
-
-        // Safety net: if the folder is still wrong after install, move it.
+        // Runs after a successful install (priority 10), before WordPress's own
+        // reactivate_plugin_after_upgrade (priority 15), so the canonical folder
+        // is in place before reactivation is attempted.
         add_filter('upgrader_post_install', [self::class, 'normalize_folder_after_install'], 10, 3);
 
         if (is_admin()) {
@@ -298,74 +297,43 @@ final class GitHubUpdater
     }
 
     /**
-     * Renames the extracted ZIP directory to the canonical folder name before
-     * WordPress moves it into wp-content/plugins/.
+     * Moves the installed plugin directory to the canonical folder name after a
+     * successful update.
      *
-     * This is the correct place to fix GitHub's version-stamped folder names.
-     * The upgrader_source_selection filter fires after extraction to a temp
-     * directory but before the folder is moved to its final location, so
-     * returning a renamed path here causes WordPress to install the plugin
-     * under forms-webhook-integrator/ rather than Forms-Webhook-Integrator-1.2.3/.
+     * Runs at priority 10 on upgrader_post_install.  WordPress's own
+     * Plugin_Upgrader::reactivate_plugin_after_upgrade() runs at priority 15, so
+     * by the time reactivation is attempted the plugin file is already at the
+     * correct path and activation succeeds without any active-plugins manipulation.
      *
-     * @param string   $source        Path to the extracted package directory in the temp folder.
-     * @param string   $remote_source Path to the parent temp directory.
-     * @param mixed    $upgrader      WP_Upgrader instance (typed mixed — not always available at parse time).
-     * @param array<string, mixed> $hook_extra Hook extra data passed by the upgrader.
-     *
-     * @return string The (possibly renamed) source path.
-     */
-    public static function fix_source_folder(string $source, string $remote_source, mixed $upgrader, array $hook_extra): string
-    {
-        // Only handle our plugin.
-        if (empty($hook_extra['plugin']) || $hook_extra['plugin'] !== self::plugin_basename()) {
-            return $source;
-        }
-
-        $desired_source = trailingslashit($remote_source) . self::DESIRED_FOLDER;
-
-        // Nothing to do if the folder is already named correctly.
-        if (trailingslashit(wp_normalize_path($source)) === trailingslashit(wp_normalize_path($desired_source))) {
-            return $source;
-        }
-
-        global $wp_filesystem;
-        if (!$wp_filesystem) {
-            require_once ABSPATH . 'wp-admin/includes/file.php';
-            WP_Filesystem();
-        }
-        if (!$wp_filesystem) {
-            return $source;
-        }
-
-        if (!$wp_filesystem->move($source, $desired_source)) {
-            // Could not rename — return original so the upgrade still proceeds.
-            return $source;
-        }
-
-        return $desired_source;
-    }
-
-    /**
-     * Safety net: if WordPress still installs into a version-stamped folder after
-     * an update, moves it to the canonical folder and fixes the active-plugins list.
-     *
-     * @param mixed                $response   The upgrader response passed through.
-     * @param mixed                $hook_extra Extra hook data (type, action, plugin basename).
-     * @param array<string, mixed> $result     Result data including the destination path.
+     * @param mixed                $response   Pass-through value; a WP_Error here means the
+     *                                         install already failed — we leave it unchanged.
+     * @param mixed                $hook_extra Hook extra data (type, action, plugin basename).
+     * @param array<string, mixed> $result     Result array from install_package(), including
+     *                                         'destination' — the path WordPress chose.
      *
      * @return mixed
      */
     public static function normalize_folder_after_install(mixed $response, mixed $hook_extra, mixed $result): mixed
     {
-        if (empty($hook_extra['type'])   || $hook_extra['type']   !== 'plugin') return $response;
-        if (empty($hook_extra['action']) || $hook_extra['action'] !== 'update') return $response;
-        if (empty($hook_extra['plugin']) || $hook_extra['plugin'] !== self::plugin_basename()) return $response;
-        if (empty($result['destination'])) return $response;
+        // Only handle our plugin.
+        if (empty($hook_extra['plugin']) || $hook_extra['plugin'] !== self::plugin_basename()) {
+            return $response;
+        }
+
+        // Don't touch a failed installation.
+        if (is_wp_error($response)) {
+            return $response;
+        }
+
+        if (empty($result['destination'])) {
+            return $response;
+        }
 
         $desired_dir   = trailingslashit(WP_PLUGIN_DIR) . self::DESIRED_FOLDER;
-        $installed_dir = rtrim((string) $result['destination'], '/\\');
+        $installed_dir = rtrim(wp_normalize_path((string) $result['destination']), '/');
 
-        if (wp_normalize_path($installed_dir) === wp_normalize_path($desired_dir)) {
+        // Already in the right place — nothing to do.
+        if ($installed_dir === rtrim(wp_normalize_path($desired_dir), '/')) {
             return $response;
         }
 
@@ -378,42 +346,20 @@ final class GitHubUpdater
             return $response;
         }
 
-        // Only move if the installed directory actually contains our plugin file.
+        // Confirm our plugin file is actually present in the installed directory.
         if (!$wp_filesystem->exists(trailingslashit($installed_dir) . self::PLUGIN_FILE)) {
             return $response;
         }
 
+        // Remove a stale correctly-named directory if one somehow exists.
         if ($wp_filesystem->is_dir($desired_dir)) {
             $wp_filesystem->delete($desired_dir, true);
         }
 
-        $wp_filesystem->move($installed_dir, $desired_dir, true);
+        // Move to the canonical folder name.
+        $wp_filesystem->move($installed_dir, $desired_dir);
 
-        // Keep the active-plugins list in sync.
-        $old_basename = $hook_extra['plugin'];
-        $new_basename = self::plugin_basename();
-
-        $active_plugins = get_option('active_plugins', []);
-        if (is_array($active_plugins)) {
-            $index = array_search($old_basename, $active_plugins, true);
-            if ($index !== false) {
-                $active_plugins[$index] = $new_basename;
-                update_option('active_plugins', array_values($active_plugins));
-            }
-        }
-
-        if (is_multisite()) {
-            $network_active = get_site_option('active_sitewide_plugins', []);
-            if (is_array($network_active) && isset($network_active[$old_basename])) {
-                $network_active[$new_basename] = $network_active[$old_basename];
-                unset($network_active[$old_basename]);
-                update_site_option('active_sitewide_plugins', $network_active);
-            }
-        }
-
-        if (function_exists('wp_clean_plugins_cache')) {
-            wp_clean_plugins_cache(true);
-        }
+        wp_clean_plugins_cache(true);
 
         return $response;
     }
