@@ -1,0 +1,603 @@
+/* =============================================================================
+   Elementor Forms Webhook Integrator — Admin Styles
+   ============================================================================= */
+
+/* ── Layout ─────────────────────────────────────────────────────────────────── */
+
+.fwi-wrap h1 {
+    margin-bottom: 20px;
+}
+
+.fwi-card {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.fwi-card-title {
+    margin-top: 0;
+    margin-bottom: 16px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1d2327;
+    border-bottom: 1px solid #f0f0f1;
+    padding-bottom: 12px;
+}
+
+/* ── Toggle Switch ───────────────────────────────────────────────────────────── */
+
+.fwi-toggle-card {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-wrap: wrap;
+}
+
+.fwi-toggle-card .fwi-card-title {
+    margin-bottom: 0;
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-right: 20px;
+    flex-shrink: 0;
+}
+
+.fwi-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.fwi-toggle {
+    position: relative;
+    display: inline-block;
+    width: 52px;
+    height: 28px;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.fwi-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+}
+
+.fwi-toggle-slider {
+    position: absolute;
+    inset: 0;
+    background-color: #c3c4c7;
+    border-radius: 28px;
+    transition: background-color 0.25s ease;
+}
+
+.fwi-toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    left: 4px;
+    top: 4px;
+    background-color: #fff;
+    border-radius: 50%;
+    transition: transform 0.25s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.fwi-toggle input:checked + .fwi-toggle-slider {
+    background-color: #2271b1;
+}
+
+.fwi-toggle input:checked + .fwi-toggle-slider::before {
+    transform: translateX(24px);
+}
+
+.fwi-toggle input:focus-visible + .fwi-toggle-slider {
+    outline: 2px solid #2271b1;
+    outline-offset: 2px;
+}
+
+.fwi-toggle-label {
+    font-weight: 600;
+    font-size: 13px;
+    color: #1d2327;
+    min-width: 52px;
+}
+
+/* ── Add-row (shared between excluded forms and query params) ────────────────── */
+
+.fwi-row-add {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.fwi-row-add select,
+.fwi-row-add input[type="text"] {
+    max-width: 260px;
+}
+
+.fwi-param-input {
+    width: 180px;
+}
+
+/* ── Dynamic Lists ───────────────────────────────────────────────────────────── */
+
+.fwi-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.fwi-list-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: #f6f7f7;
+    border: 1px solid #dcdcde;
+    border-radius: 3px;
+    margin-bottom: 6px;
+    font-size: 13px;
+}
+
+.fwi-item-label {
+    flex: 1;
+    word-break: break-word;
+}
+
+.fwi-item-label code {
+    font-size: 12px;
+    background: #e8e8e8;
+    padding: 1px 4px;
+    border-radius: 2px;
+}
+
+.fwi-empty-msg {
+    color: #757575;
+    font-style: italic;
+    padding: 6px 0;
+    font-size: 13px;
+}
+
+.fwi-remove-btn {
+    flex-shrink: 0;
+    color: #d63638 !important;
+    border-color: #d63638 !important;
+}
+
+.fwi-remove-btn:hover {
+    background: #d63638 !important;
+    color: #fff !important;
+}
+
+/* ── Accordion ───────────────────────────────────────────────────────────────── */
+
+.fwi-accordion {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+    overflow: hidden;
+}
+
+.fwi-accordion-header {
+    width: 100%;
+    background: #f6f7f7;
+    border: none;
+    border-bottom: 1px solid #c3c4c7;
+    padding: 14px 20px;
+    text-align: left;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1d2327;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: background-color 0.15s ease;
+}
+
+.fwi-accordion-header:hover {
+    background: #ececec;
+}
+
+.fwi-accordion-header[aria-expanded="true"] {
+    background: #fff;
+}
+
+.fwi-accordion-title {
+    flex: 1;
+}
+
+.fwi-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 26px;
+    height: 22px;
+    padding: 0 7px;
+    background: #2271b1;
+    color: #fff;
+    border-radius: 11px;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.fwi-badge-error {
+    background: #d63638;
+}
+
+.fwi-accordion-arrow {
+    font-size: 10px;
+    color: #757575;
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+}
+
+.fwi-accordion-header[aria-expanded="true"] .fwi-accordion-arrow {
+    transform: rotate(180deg);
+}
+
+.fwi-accordion-body {
+    padding: 16px 20px;
+}
+
+/* ── Analytics: Log Entries ──────────────────────────────────────────────────── */
+
+.fwi-retention-notice {
+    margin-bottom: 16px !important;
+}
+
+.fwi-analytics-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+
+.fwi-analytics-toolbar .fwi-clear-form {
+    margin: 0;
+}
+
+.fwi-export-buttons {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.fwi-btn-danger {
+    color: #d63638 !important;
+    border-color: #d63638 !important;
+}
+
+.fwi-btn-danger:hover {
+    background: #d63638 !important;
+    color: #fff !important;
+}
+
+.fwi-log-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.fwi-log-item {
+    border: 1px solid #dcdcde;
+    border-left-width: 4px;
+    border-radius: 4px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.fwi-log-error {
+    border-left-color: #d63638;
+    background: #fff8f8;
+}
+
+.fwi-log-success {
+    border-left-color: #00a32a;
+    background: #f7fef7;
+}
+
+.fwi-log-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+
+.fwi-log-time {
+    color: #757575;
+    font-size: 12px;
+    flex-shrink: 0;
+}
+
+.fwi-log-form {
+    font-weight: 600;
+}
+
+.fwi-log-status {
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    flex-shrink: 0;
+}
+
+.fwi-log-status.error {
+    background: #d63638;
+    color: #fff;
+}
+
+.fwi-log-status.success {
+    background: #00a32a;
+    color: #fff;
+}
+
+.fwi-log-delete-btn {
+    margin-left: auto;
+    flex-shrink: 0;
+    padding: 1px 8px !important;
+    height: 22px;
+    font-size: 12px;
+    line-height: 20px;
+    color: #d63638 !important;
+    border-color: #d63638 !important;
+}
+
+.fwi-log-delete-btn:hover {
+    background: #d63638 !important;
+    color: #fff !important;
+}
+
+.fwi-log-url {
+    margin-bottom: 6px;
+    word-break: break-all;
+}
+
+.fwi-log-url code {
+    font-size: 12px;
+    background: #f0f0f1;
+    padding: 1px 5px;
+    border-radius: 2px;
+}
+
+.fwi-log-error-msg {
+    color: #d63638;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.fwi-log-data,
+.fwi-log-response {
+    margin-bottom: 6px;
+}
+
+.fwi-log-data pre,
+.fwi-log-response pre {
+    background: #f6f7f7;
+    border: 1px solid #dcdcde;
+    border-radius: 3px;
+    padding: 8px 10px;
+    margin: 4px 0 0;
+    overflow-x: auto;
+    font-size: 12px;
+    max-height: 160px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* ── Analytics: Accordion Controls (filter + per-page) ───────────────────────── */
+
+.fwi-acc-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 10px 0 14px;
+    border-bottom: 1px solid #f0f0f1;
+    margin-bottom: 14px;
+}
+
+.fwi-acc-filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.fwi-acc-filters select,
+.fwi-acc-perpage select {
+    font-size: 13px;
+    padding: 4px 6px;
+    border: 1px solid #c3c4c7;
+    border-radius: 3px;
+    background: #fff;
+    color: #1d2327;
+    cursor: pointer;
+}
+
+.fwi-acc-perpage label {
+    font-size: 13px;
+    color: #50575e;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+/* ── Analytics: Pagination ───────────────────────────────────────────────────── */
+
+.fwi-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 14px 0 4px;
+    border-top: 1px solid #f0f0f1;
+    margin-top: 10px;
+}
+
+.fwi-page-info {
+    font-size: 13px;
+    color: #50575e;
+}
+
+.fwi-page-buttons {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.fwi-page-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 30px;
+    height: 28px;
+    padding: 0 8px;
+    border: 1px solid #c3c4c7;
+    border-radius: 3px;
+    background: #fff;
+    color: #1d2327;
+    font-size: 13px;
+    cursor: pointer;
+    line-height: 1;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.fwi-page-btn:hover {
+    background: #f0f0f1;
+    border-color: #a0a0a8;
+}
+
+.fwi-page-btn-active {
+    background: #2271b1;
+    border-color: #2271b1;
+    color: #fff;
+    font-weight: 700;
+    pointer-events: none;
+}
+
+.fwi-page-ellipsis {
+    font-size: 13px;
+    color: #757575;
+    padding: 0 4px;
+    line-height: 28px;
+}
+
+/* ── Settings: Webhook URL row ───────────────────────────────────────────────── */
+
+.fwi-webhook-url-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.fwi-webhook-url-row input[type="url"] {
+    flex: 1;
+    min-width: 220px;
+    max-width: 400px;
+}
+
+/* ── Settings: Test Webhook result ───────────────────────────────────────────── */
+
+.fwi-test-result {
+    margin-top: 8px;
+    padding: 6px 10px;
+    border-radius: 3px;
+    font-size: 13px;
+    font-weight: 500;
+    max-width: 480px;
+}
+
+.fwi-test-result.fwi-test-success {
+    background: #edfaef;
+    border: 1px solid #00a32a;
+    color: #1a6b2e;
+}
+
+.fwi-test-result.fwi-test-error {
+    background: #fdf0f0;
+    border: 1px solid #d63638;
+    color: #8b1a1a;
+}
+
+/* ── Settings: Last test status ──────────────────────────────────────────────── */
+
+.fwi-last-test {
+    display: inline-block;
+    margin-top: 6px;
+    padding: 4px 10px;
+    border-radius: 3px;
+    font-size: 12px;
+    max-width: 480px;
+}
+
+.fwi-last-test-success {
+    background: #edfaef;
+    border: 1px solid #00a32a;
+    color: #1a6b2e;
+}
+
+.fwi-last-test-error {
+    background: #fdf0f0;
+    border: 1px solid #d63638;
+    color: #8b1a1a;
+}
+
+.fwi-last-test-meta {
+    opacity: 0.75;
+}
+
+/* ── Settings: Per-form Override Sections ────────────────────────────────────── */
+
+.fwi-form-overrides-list {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.fwi-form-override {
+    border: 1px solid #dcdcde;
+    border-radius: 4px;
+    padding: 16px 20px;
+}
+
+.fwi-form-override:nth-child(odd) {
+    background: #e8e8e8;
+}
+
+.fwi-form-override:nth-child(even) {
+    background: #f6f6f6;
+}
+
+.fwi-form-override-title {
+    margin: 0 0 14px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #1d2327;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e5e5e5;
+}

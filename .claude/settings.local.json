@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php -l elementor-forms-webhook-integrator.php)",
+      "Bash(php -l src/Autoloader.php)",
+      "Bash(php -l src/Plugin.php)",
+      "Bash(php -l src/Settings/SettingsManager.php)",
+      "Bash(php -l src/Forms/ElementorFormsHelper.php)",
+      "Bash(php -l \"/Users/cpaschall/Local Sites/microsite-testing/app/public/wp-content/plugins/elementor-forms-webhook-integrator/elementor-forms-webhook-integrator.php\")",
+      "Bash(php -l \"/Users/cpaschall/Local Sites/microsite-testing/app/public/wp-content/plugins/elementor-forms-webhook-integrator/src/Forms/ElementorFormsHelper.php\")"
+    ]
+  }
+}
