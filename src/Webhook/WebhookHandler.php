@@ -252,7 +252,7 @@ final class WebhookHandler
         $response_code = (int) wp_remote_retrieve_response_code($response);
 
         // Consider 200 and 201 as successful responses; anything else (including 202, 204, etc.) is a failure for our purposes since it likely means the webhook did not process the data as intended. Transport-level errors are also failures (response_code = 0).
-        $ok_response = $response_code === 200 || $response_code === 201;
+        $ok_response = $response_code === 200 || $response_code === 201 || $response_code === 202 || $response_code === 204;
 
         // Log non-successful responses for debugging
         if (!$ok_response) {

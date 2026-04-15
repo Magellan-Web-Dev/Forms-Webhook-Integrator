@@ -66,7 +66,7 @@ final class WebhookTester
             ];
         } else {
             $code    = (int) wp_remote_retrieve_response_code($response);
-            $success = ($code === 200 || $code === 201);
+            $success = ($code === 200 || $code === 201 || $code === 202 || $code === 204);
             $result  = [
                 'success' => $success,
                 'message' => 'HTTP ' . $code . ($success ? ' — Test passed.' : ' — Test failed.'),
