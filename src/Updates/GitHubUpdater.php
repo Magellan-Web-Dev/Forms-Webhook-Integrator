@@ -22,9 +22,11 @@ if (!defined('ABSPATH')) exit;
  *
  * Folder integrity:
  *  GitHub archives are extracted into a version-stamped folder by default
- *  (e.g. Forms-Webhook-Integrator-1.2.3/).  Two complementary filters ensure the
- *  plugin is always installed into the canonical forms-webhook-integrator/ folder
- *  so the plugin does not deactivate after updating.
+ *  (e.g. Forms-Webhook-Integrator-1.2.3/).  The primary fix is the
+ *  upgrader_source_selection filter, which renames the extracted temp directory
+ *  to the canonical name before WordPress moves it into wp-content/plugins/.
+ *  Two additional filters (upgrader_post_install and a boot-time scan) act as
+ *  safety nets in case something still goes wrong.
  */
 final class GitHubUpdater
 {
@@ -63,8 +65,13 @@ final class GitHubUpdater
     {
         add_filter('pre_set_site_transient_update_plugins', [self::class, 'check_for_update']);
         add_filter('plugins_api',                           [self::class, 'plugins_api'], 10, 3);
-        add_filter('upgrader_package_options',              [self::class, 'force_destination_folder'], 10, 1);
-        add_filter('upgrader_post_install',                 [self::class, 'normalize_folder_after_install'], 10, 3);
+
+        // Primary folder-name fix: rename the extracted temp directory before
+        // WordPress moves it into wp-content/plugins/.
+        add_filter('upgrader_source_selection', [self::class, 'fix_source_folder'], 10, 4);
+
+        // Safety net: if the folder is still wrong after install, move it.
+        add_filter('upgrader_post_install', [self::class, 'normalize_folder_after_install'], 10, 3);
 
         if (is_admin()) {
             add_filter('plugin_action_links_' . self::plugin_basename(), [self::class, 'add_action_links']);
@@ -291,26 +298,51 @@ final class GitHubUpdater
     }
 
     /**
-     * Forces WordPress to extract the plugin archive into the canonical folder name
-     * rather than the GitHub-generated version-stamped folder.
+     * Renames the extracted ZIP directory to the canonical folder name before
+     * WordPress moves it into wp-content/plugins/.
      *
-     * This is the primary mechanism for keeping the install directory correct.
+     * This is the correct place to fix GitHub's version-stamped folder names.
+     * The upgrader_source_selection filter fires after extraction to a temp
+     * directory but before the folder is moved to its final location, so
+     * returning a renamed path here causes WordPress to install the plugin
+     * under forms-webhook-integrator/ rather than Forms-Webhook-Integrator-1.2.3/.
      *
-     * @param array<string, mixed> $options Upgrader package options.
+     * @param string   $source        Path to the extracted package directory in the temp folder.
+     * @param string   $remote_source Path to the parent temp directory.
+     * @param mixed    $upgrader      WP_Upgrader instance (typed mixed — not always available at parse time).
+     * @param array<string, mixed> $hook_extra Hook extra data passed by the upgrader.
      *
-     * @return array<string, mixed>
+     * @return string The (possibly renamed) source path.
      */
-    public static function force_destination_folder(array $options): array
+    public static function fix_source_folder(string $source, string $remote_source, mixed $upgrader, array $hook_extra): string
     {
-        if (empty($options['hook_extra']['type'])   || $options['hook_extra']['type']   !== 'plugin') return $options;
-        if (empty($options['hook_extra']['action']) || $options['hook_extra']['action'] !== 'update') return $options;
-        if (empty($options['hook_extra']['plugin']) || $options['hook_extra']['plugin'] !== self::plugin_basename()) return $options;
+        // Only handle our plugin.
+        if (empty($hook_extra['plugin']) || $hook_extra['plugin'] !== self::plugin_basename()) {
+            return $source;
+        }
 
-        $options['destination']      = WP_PLUGIN_DIR;
-        $options['destination_name'] = self::DESIRED_FOLDER;
-        $options['clear_destination'] = true;
+        $desired_source = trailingslashit($remote_source) . self::DESIRED_FOLDER;
 
-        return $options;
+        // Nothing to do if the folder is already named correctly.
+        if (trailingslashit(wp_normalize_path($source)) === trailingslashit(wp_normalize_path($desired_source))) {
+            return $source;
+        }
+
+        global $wp_filesystem;
+        if (!$wp_filesystem) {
+            require_once ABSPATH . 'wp-admin/includes/file.php';
+            WP_Filesystem();
+        }
+        if (!$wp_filesystem) {
+            return $source;
+        }
+
+        if (!$wp_filesystem->move($source, $desired_source)) {
+            // Could not rename — return original so the upgrade still proceeds.
+            return $source;
+        }
+
+        return $desired_source;
     }
 
     /**
