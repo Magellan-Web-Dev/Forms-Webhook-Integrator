@@ -9,6 +9,7 @@ use FormsWebhookIntegrator\Admin\AdminMenu;
 use FormsWebhookIntegrator\Database\DatabaseManager;
 use FormsWebhookIntegrator\Forms\ElementorFormsBridge;
 use FormsWebhookIntegrator\Settings\SettingsManager;
+use FormsWebhookIntegrator\Updates\GitHubUpdater;
 use FormsWebhookIntegrator\Webhook\WebhookHandler;
 
 /**
@@ -101,6 +102,9 @@ final class Plugin
      */
     public function init(): void
     {
+        // Register GitHub update checks and the "Check for updates" Plugins-screen action.
+        GitHubUpdater::init();
+
         // Ensure the custom log table exists for updates that skip the activation hook.
         DatabaseManager::maybeCreateTable();
 
