@@ -423,6 +423,51 @@
     flex-wrap: wrap;
 }
 
+.fwi-acc-search {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.fwi-search-input {
+    font-size: 13px;
+    padding: 4px 8px;
+    border: 1px solid #c3c4c7;
+    border-radius: 3px;
+    background: #fff;
+    color: #1d2327;
+    width: 200px;
+}
+
+.fwi-search-input:focus {
+    border-color: #2271b1;
+    outline: none;
+    box-shadow: 0 0 0 1px #2271b1;
+}
+
+.fwi-search-clear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 1px solid #c3c4c7;
+    border-radius: 3px;
+    background: #fff;
+    color: #50575e;
+    font-size: 12px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.fwi-search-clear:hover {
+    background: #f0f0f1;
+    border-color: #a0a0a8;
+    color: #1d2327;
+}
+
 .fwi-acc-filters select,
 .fwi-acc-perpage select {
     font-size: 13px;

@@ -547,7 +547,7 @@
             list.after(paginationEl);
 
             // ── Per-accordion state ───────────────────────────────────────────
-            const state = { page: 1, perPage: 10, year: '', month: '' };
+            const state = { page: 1, perPage: 10, year: '', month: '', search: '' };
 
             // ── Event listeners ───────────────────────────────────────────────
             controls.querySelector('.fwi-filter-year').addEventListener('change', function () {
@@ -568,6 +568,19 @@
                 render();
             });
 
+            controls.querySelector('.fwi-search-input').addEventListener('input', function () {
+                state.search = this.value;
+                state.page   = 1;
+                render();
+            });
+
+            controls.querySelector('.fwi-search-clear').addEventListener('click', function () {
+                controls.querySelector('.fwi-search-input').value = '';
+                state.search = '';
+                state.page   = 1;
+                render();
+            });
+
             // ── Helpers ───────────────────────────────────────────────────────
 
             function getFilteredItems() {
@@ -575,6 +588,11 @@
                     const date = item.dataset.date || '';
                     if (state.year  && date.slice(0, 4) !== state.year)  return false;
                     if (state.month && date.slice(5, 7) !== state.month) return false;
+                    if (state.search) {
+                        const needle    = state.search.toLowerCase();
+                        const haystack  = (item.dataset.requestSearch || '').toLowerCase();
+                        if (!haystack.includes(needle)) return false;
+                    }
                     return true;
                 });
             }
@@ -694,6 +712,10 @@
         return '<div class="fwi-acc-filters">' +
                    '<select class="fwi-filter-year">'  + yearOptions  + '</select>' +
                    '<select class="fwi-filter-month">' + monthOptions + '</select>' +
+                   '<div class="fwi-acc-search">' +
+                       '<input type="text" class="fwi-search-input" placeholder="Search request data\u2026" />' +
+                       '<button type="button" class="fwi-search-clear" aria-label="Clear search">\u2715</button>' +
+                   '</div>' +
                '</div>' +
                '<div class="fwi-acc-perpage">' +
                    '<label>Per page: <select class="fwi-per-page">' +

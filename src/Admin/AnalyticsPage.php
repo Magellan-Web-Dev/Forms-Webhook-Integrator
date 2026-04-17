@@ -373,7 +373,7 @@ final class AnalyticsPage
         $responseDecoded = json_decode($responseData, true);
         $errorMessage    = is_array($responseDecoded) ? (string) ($responseDecoded['error'] ?? '') : '';
         ?>
-        <li class="fwi-log-item <?php echo esc_attr($itemClass); ?>" data-date="<?php echo esc_attr($dateSlug); ?>" data-log-id="<?php echo esc_attr((string) ($entry['id'] ?? '')); ?>">
+        <li class="fwi-log-item <?php echo esc_attr($itemClass); ?>" data-date="<?php echo esc_attr($dateSlug); ?>" data-log-id="<?php echo esc_attr((string) ($entry['id'] ?? '')); ?>" data-request-search="<?php echo esc_attr((string) ($entry['request_data'] ?? '')); ?>">
 
             <div class="fwi-log-meta">
                 <span class="fwi-log-time"><?php echo esc_html($timestamp); ?></span>
