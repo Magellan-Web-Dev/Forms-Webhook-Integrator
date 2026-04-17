@@ -192,8 +192,8 @@ final class WebhookHandler
 
         // Set timestamp
         $form_data['timestamp'] = [
-            'date' => date('Y-m-d'),
-            'time' => date('H:i:s'),
+            'date' => gmdate('Y-m-d'),
+            'time' => gmdate('H:i:s'),
         ];
 
         // Convert form data to JSON

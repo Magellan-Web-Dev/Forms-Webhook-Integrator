@@ -54,7 +54,7 @@ final class WebhookLogger
                 'request_data'    => wp_json_encode($requestData) ?: '{}',
                 'response_data'   => $responseData,
                 'response_code'   => $responseCode,
-                'created_at'      => current_time('mysql'),
+                'created_at'      => current_time('mysql', true),
             ],
             ['%d', '%s', '%s', '%s', '%s', '%d', '%s']
         );
