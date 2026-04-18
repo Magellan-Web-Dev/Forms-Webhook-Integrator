@@ -26,20 +26,18 @@ final class WebhookLogger
      * else including transport errors (responseCode = 0). For transport errors,
      * responseData should be a JSON string of the form {"error": "message"}.
      *
-     * @param array<string, mixed> $requestData    The form-data payload that was JSON-encoded and POSTed.
-     * @param string               $requestUrl     The fully-qualified webhook URL (base + query params).
-     * @param array<string, mixed> $requestHeaders HTTP headers sent with the request.
-     * @param int                  $responseCode   HTTP status code returned by the webhook, or 0 when
-     *                                             a transport-level error prevented any response.
-     * @param string               $responseData   Raw response body returned by the webhook, or a
-     *                                             JSON-encoded error object for transport failures.
+     * @param array<string, mixed> $requestData  The form-data payload that was JSON-encoded and POSTed.
+     * @param string               $requestUrl   The fully-qualified webhook URL (base + query params).
+     * @param int                  $responseCode HTTP status code returned by the webhook, or 0 when
+     *                                           a transport-level error prevented any response.
+     * @param string               $responseData Raw response body returned by the webhook, or a
+     *                                           JSON-encoded error object for transport failures.
      *
      * @return void
      */
     public function log(
         array $requestData,
         string $requestUrl,
-        array $requestHeaders,
         int $responseCode,
         string $responseData
     ): void {
@@ -48,15 +46,14 @@ final class WebhookLogger
         $wpdb->insert( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
             DatabaseManager::getTableName(),
             [
-                'success'         => ($responseCode === 200 || $responseCode === 201) ? 1 : 0,
-                'request_url'     => $requestUrl,
-                'request_headers' => wp_json_encode($requestHeaders) ?: '{}',
-                'request_data'    => wp_json_encode($requestData) ?: '{}',
-                'response_data'   => $responseData,
-                'response_code'   => $responseCode,
-                'created_at'      => current_time('mysql', true),
+                'success'       => ($responseCode === 200 || $responseCode === 201 || $responseCode === 202 || $responseCode === 204) ? 1 : 0,
+                'request_url'   => $requestUrl,
+                'request_data'  => wp_json_encode($requestData) ?: '{}',
+                'response_data' => $responseData,
+                'response_code' => $responseCode,
+                'created_at'    => current_time('mysql', true),
             ],
-            ['%d', '%s', '%s', '%s', '%s', '%d', '%s']
+            ['%d', '%s', '%s', '%s', '%d', '%s']
         );
     }
 

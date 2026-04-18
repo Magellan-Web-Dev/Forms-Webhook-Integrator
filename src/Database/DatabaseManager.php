@@ -18,10 +18,9 @@ if (!defined('ABSPATH')) exit;
  * Table schema:
  *  - id            BIGINT(20) UNSIGNED  Auto-incrementing primary key.
  *  - success       TINYINT(1)           1 = response was 200 or 201, 0 = anything else.
- *  - request_url     TEXT                 The fully-qualified webhook URL (base + query params)
- *                                         used for the request.
- *  - request_headers LONGTEXT             JSON object of HTTP headers sent with the request.
- *  - request_data    LONGTEXT             JSON payload sent to the webhook.
+ *  - request_url   TEXT                 The fully-qualified webhook URL (base + query params)
+ *                                       used for the request.
+ *  - request_data  LONGTEXT             JSON payload sent to the webhook.
  *  - response_data LONGTEXT             Raw response body returned by the webhook.
  *                                       For transport-level errors this contains a
  *                                       JSON object of the form {"error": "message"}.
@@ -48,7 +47,7 @@ final class DatabaseManager
      * definition changes so that maybeCreateTable() triggers a dbDelta run
      * for existing installations.
      */
-    private const DB_VERSION = '4.0';
+    private const DB_VERSION = '5.0';
 
     /**
      * Returns the fully-qualified table name including the WordPress database prefix.
@@ -102,7 +101,6 @@ final class DatabaseManager
             id bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
             success tinyint(1) NOT NULL DEFAULT 0,
             request_url text NOT NULL,
-            request_headers longtext NOT NULL,
             request_data longtext NOT NULL,
             response_data longtext NOT NULL,
             response_code int NOT NULL DEFAULT 0,

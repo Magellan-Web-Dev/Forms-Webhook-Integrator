@@ -64,18 +64,18 @@ final class GitHubUpdater
      */
     public static function init(): void
     {
-        add_filter('pre_set_site_transient_update_plugins', [self::class, 'check_for_update']);
-        add_filter('plugins_api',                           [self::class, 'plugins_api'], 10, 3);
+        add_filter('pre_set_site_transient_update_plugins', [self::class, 'checkForUpdate']);
+        add_filter('plugins_api',                           [self::class, 'pluginsApi'], 10, 3);
 
         // Runs after a successful install (priority 10), before WordPress's own
         // reactivate_plugin_after_upgrade (priority 15), so the canonical folder
         // is in place before reactivation is attempted.
-        add_filter('upgrader_post_install', [self::class, 'normalize_folder_after_install'], 10, 3);
+        add_filter('upgrader_post_install', [self::class, 'normalizeFolderAfterInstall'], 10, 3);
 
         if (is_admin()) {
-            add_filter('plugin_action_links_' . self::plugin_basename(), [self::class, 'add_action_links']);
-            add_action('admin_init',    [self::class, 'handle_check_for_updates']);
-            add_action('admin_notices', [self::class, 'maybe_show_checked_notice']);
+            add_filter('plugin_action_links_' . self::pluginBasename(), [self::class, 'addActionLinks']);
+            add_action('admin_init',    [self::class, 'handleCheckForUpdates']);
+            add_action('admin_notices', [self::class, 'maybeShowCheckedNotice']);
         }
     }
 
@@ -87,13 +87,13 @@ final class GitHubUpdater
      *
      * @return false|object|array
      */
-    public static function check_for_update(mixed $transient): mixed
+    public static function checkForUpdate(mixed $transient): mixed
     {
         if (empty($transient) || empty($transient->checked)) {
             return $transient;
         }
 
-        $release = self::get_latest_release();
+        $release = self::getLatestRelease();
         if (!$release) {
             return $transient;
         }
@@ -101,7 +101,7 @@ final class GitHubUpdater
         $current = defined('FWI_VERSION') ? FWI_VERSION : '0.0.0';
 
         if (version_compare($release['version'], $current, '>')) {
-            $plugin_basename = self::plugin_basename();
+            $plugin_basename = self::pluginBasename();
 
             $transient->response[$plugin_basename] = (object) [
                 'slug'        => self::PLUGIN_SLUG,
@@ -125,13 +125,13 @@ final class GitHubUpdater
      *
      * @return false|object|array
      */
-    public static function plugins_api(mixed $result, string $action, mixed $args): mixed
+    public static function pluginsApi(mixed $result, string $action, mixed $args): mixed
     {
         if ($action !== 'plugin_information' || empty($args->slug) || $args->slug !== self::PLUGIN_SLUG) {
             return $result;
         }
 
-        $release = self::get_latest_release();
+        $release = self::getLatestRelease();
         if (!$release) {
             return $result;
         }
@@ -157,7 +157,7 @@ final class GitHubUpdater
      *
      * @return array<int|string, string>
      */
-    public static function add_action_links(array $links): array
+    public static function addActionLinks(array $links): array
     {
         $check_url = wp_nonce_url(
             add_query_arg('action', 'fwi_check_for_updates', self_admin_url('plugins.php')),
@@ -179,7 +179,7 @@ final class GitHubUpdater
      *
      * @return void
      */
-    public static function handle_check_for_updates(): void
+    public static function handleCheckForUpdates(): void
     {
         if (
             empty($_GET['action']) ||
@@ -209,13 +209,13 @@ final class GitHubUpdater
      *
      * @return void
      */
-    public static function maybe_show_checked_notice(): void
+    public static function maybeShowCheckedNotice(): void
     {
         if (empty($_GET['fwi_update_checked']) || $_GET['fwi_update_checked'] !== '1') {
             return;
         }
 
-        $release = self::get_latest_release();
+        $release = self::getLatestRelease();
         $current = defined('FWI_VERSION') ? FWI_VERSION : '0.0.0';
 
         if ($release && version_compare($release['version'], $current, '>')) {
@@ -238,7 +238,7 @@ final class GitHubUpdater
      * @return array{tag: string, version: string, zip_url: string, html_url: string}|null
      *         Null when the API request fails or the response is malformed.
      */
-    private static function get_latest_release(): ?array
+    private static function getLatestRelease(): ?array
     {
         $cached = get_site_transient(self::CACHE_KEY);
         if (is_array($cached)) {
@@ -291,7 +291,7 @@ final class GitHubUpdater
      *
      * @return string
      */
-    private static function plugin_basename(): string
+    private static function pluginBasename(): string
     {
         return self::DESIRED_FOLDER . '/' . self::PLUGIN_FILE;
     }
@@ -313,10 +313,10 @@ final class GitHubUpdater
      *
      * @return mixed
      */
-    public static function normalize_folder_after_install(mixed $response, mixed $hook_extra, mixed $result): mixed
+    public static function normalizeFolderAfterInstall(mixed $response, mixed $hook_extra, mixed $result): mixed
     {
         // Only handle our plugin.
-        if (empty($hook_extra['plugin']) || $hook_extra['plugin'] !== self::plugin_basename()) {
+        if (empty($hook_extra['plugin']) || $hook_extra['plugin'] !== self::pluginBasename()) {
             return $response;
         }
 
@@ -364,63 +364,4 @@ final class GitHubUpdater
         return $response;
     }
 
-    /**
-     * On-demand folder normalisation called from admin_init.
-     *
-     * Catches any case where a previous update left the plugin in a
-     * version-stamped folder (e.g. after a failed move), without requiring a
-     * new update to trigger the fix.
-     *
-     * @return void
-     */
-    public static function normalize_plugin_folder(): void
-    {
-        $desired_dir = WP_PLUGIN_DIR . '/' . self::DESIRED_FOLDER;
-
-        if (is_dir($desired_dir) && file_exists($desired_dir . '/' . self::PLUGIN_FILE)) {
-            return;
-        }
-
-        $candidates = glob(WP_PLUGIN_DIR . '/*/' . self::PLUGIN_FILE);
-        if (empty($candidates)) {
-            return;
-        }
-
-        $current_dir    = dirname($candidates[0]);
-        $current_folder = basename($current_dir);
-
-        if ($current_folder === self::DESIRED_FOLDER) {
-            return;
-        }
-
-        require_once ABSPATH . 'wp-admin/includes/file.php';
-        WP_Filesystem();
-        global $wp_filesystem;
-
-        if (!$wp_filesystem) {
-            return;
-        }
-
-        if ($wp_filesystem->is_dir($desired_dir)) {
-            $wp_filesystem->delete($desired_dir, true);
-        }
-
-        $wp_filesystem->move($current_dir, $desired_dir, true);
-
-        $old_basename = $current_folder . '/' . self::PLUGIN_FILE;
-        $new_basename = self::DESIRED_FOLDER . '/' . self::PLUGIN_FILE;
-
-        $active_plugins = get_option('active_plugins', []);
-        if (is_array($active_plugins)) {
-            $idx = array_search($old_basename, $active_plugins, true);
-            if ($idx !== false) {
-                $active_plugins[$idx] = $new_basename;
-                update_option('active_plugins', array_values($active_plugins));
-            }
-        }
-
-        if (function_exists('wp_clean_plugins_cache')) {
-            wp_clean_plugins_cache(true);
-        }
-    }
 }

@@ -139,7 +139,7 @@ final class AnalyticsPage
         // UTF-8 BOM for Excel compatibility
         fwrite($output, "\xEF\xBB\xBF");
 
-        fputcsv($output, ['ID', 'Date/Time', 'Success', 'Form Name', 'Request URL', 'Request Headers', 'Response Code', 'Request Data', 'Response Data']);
+        fputcsv($output, ['ID', 'Date/Time', 'Success', 'Form Name', 'Request URL', 'Response Code', 'Request Data', 'Response Data']);
 
         foreach ($logs as $entry) {
             $requestDecoded = json_decode((string) ($entry['request_data'] ?? '{}'), true);
@@ -151,7 +151,6 @@ final class AnalyticsPage
                 (int) ($entry['success'] ?? 0) === 1 ? 'Yes' : 'No',
                 $formName,
                 (string) ($entry['request_url'] ?? ''),
-                (string) ($entry['request_headers'] ?? ''),
                 (int) ($entry['response_code'] ?? 0),
                 (string) ($entry['request_data'] ?? ''),
                 (string) ($entry['response_data'] ?? ''),
@@ -191,18 +190,15 @@ final class AnalyticsPage
             $requestDecoded  = json_decode((string) ($entry['request_data'] ?? '{}'), true);
             $responseDecoded = json_decode((string) ($entry['response_data'] ?? ''), true);
 
-            $headersDecoded = json_decode((string) ($entry['request_headers'] ?? '{}'), true);
-
             $output[] = [
-                'id'              => (int) ($entry['id'] ?? 0),
-                'created_at'      => (string) ($entry['created_at'] ?? ''),
-                'success'         => (int) ($entry['success'] ?? 0) === 1,
-                'form_name'       => is_array($requestDecoded) ? (string) ($requestDecoded['form_name'] ?? '') : '',
-                'request_url'     => (string) ($entry['request_url'] ?? ''),
-                'request_headers' => is_array($headersDecoded) ? $headersDecoded : [],
-                'response_code'   => (int) ($entry['response_code'] ?? 0),
-                'request_data'    => is_array($requestDecoded) ? $requestDecoded : [],
-                'response_data'   => is_array($responseDecoded) ? $responseDecoded : (string) ($entry['response_data'] ?? ''),
+                'id'           => (int) ($entry['id'] ?? 0),
+                'created_at'   => (string) ($entry['created_at'] ?? ''),
+                'success'      => (int) ($entry['success'] ?? 0) === 1,
+                'form_name'    => is_array($requestDecoded) ? (string) ($requestDecoded['form_name'] ?? '') : '',
+                'request_url'  => (string) ($entry['request_url'] ?? ''),
+                'response_code' => (int) ($entry['response_code'] ?? 0),
+                'request_data' => is_array($requestDecoded) ? $requestDecoded : [],
+                'response_data' => is_array($responseDecoded) ? $responseDecoded : (string) ($entry['response_data'] ?? ''),
             ];
         }
 
@@ -354,9 +350,8 @@ final class AnalyticsPage
         $statusText   = $isError ? 'Error' : 'Success';
         $statusClass  = $isError ? 'error' : 'success';
         $timestamp    = (string) ($entry['created_at'] ?? '');
-        $requestUrl     = (string) ($entry['request_url'] ?? '');
-        $requestHeaders = (string) ($entry['request_headers'] ?? '');
-        $responseCode   = (int) ($entry['response_code'] ?? 0);
+        $requestUrl   = (string) ($entry['request_url'] ?? '');
+        $responseCode = (int) ($entry['response_code'] ?? 0);
         $responseData = (string) ($entry['response_data'] ?? '');
 
         // YYYY-MM slice used by JS for month/year filtering
@@ -392,13 +387,6 @@ final class AnalyticsPage
             <?php if ($requestUrl !== ''): ?>
                 <div class="fwi-log-url">
                     <strong>Request URL:</strong> <code><?php echo esc_html($requestUrl); ?></code>
-                </div>
-            <?php endif; ?>
-
-            <?php if ($requestHeaders !== '' && $requestHeaders !== '{}'): ?>
-                <div class="fwi-log-data">
-                    <strong>Request Headers:</strong>
-                    <pre><?php echo esc_html((string) json_encode(json_decode($requestHeaders, true), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)); ?></pre>
                 </div>
             <?php endif; ?>
 

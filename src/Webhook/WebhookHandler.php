@@ -237,7 +237,6 @@ final class WebhookHandler
             $this->logger->log(
                 requestData: $form_data,
                 requestUrl: $webhookUrl,
-                requestHeaders: $headers,
                 responseCode: 0,
                 responseData: (string) wp_json_encode(['error' => $error_message])
             );
@@ -261,7 +260,6 @@ final class WebhookHandler
             $this->logger->log(
                 requestData: $form_data,
                 requestUrl: $webhookUrl,
-                requestHeaders: $headers,
                 responseCode: $response_code,
                 responseData: $response_body
             );
@@ -273,7 +271,6 @@ final class WebhookHandler
         $this->logger->log(
             requestData: $form_data,
             requestUrl: $webhookUrl,
-            requestHeaders: $headers,
             responseCode: $response_code,
             responseData: $response_body
         );
