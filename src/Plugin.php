@@ -6,11 +6,13 @@ namespace FormsWebhookIntegrator;
 if (!defined('ABSPATH')) exit;
 
 use FormsWebhookIntegrator\Admin\AdminMenu;
+use FormsWebhookIntegrator\Api\AnalyticsApiHandler;
 use FormsWebhookIntegrator\Database\DatabaseManager;
 use FormsWebhookIntegrator\Forms\ElementorFormsBridge;
 use FormsWebhookIntegrator\Settings\SettingsManager;
 use FormsWebhookIntegrator\Updates\GitHubUpdater;
 use FormsWebhookIntegrator\Webhook\WebhookHandler;
+use FormsWebhookIntegrator\Webhook\WebhookLogger;
 
 /**
  * Main plugin bootstrap class.
@@ -59,6 +61,13 @@ final class Plugin
     private readonly ElementorFormsBridge $elementorFormsBridge;
 
     /**
+     * Registers and handles the read-only analytics REST API endpoint.
+     *
+     * @var AnalyticsApiHandler
+     */
+    private readonly AnalyticsApiHandler $analyticsApiHandler;
+
+    /**
      * Constructs and wires the plugin's core dependencies.
      *
      * Private to enforce the singleton pattern; use {@see self::getInstance()}
@@ -70,6 +79,7 @@ final class Plugin
         $this->adminMenu            = new AdminMenu($this->settingsManager);
         $this->webhookHandler       = new WebhookHandler($this->settingsManager);
         $this->elementorFormsBridge = new ElementorFormsBridge($this->settingsManager, $this->webhookHandler);
+        $this->analyticsApiHandler  = new AnalyticsApiHandler($this->settingsManager, new WebhookLogger());
     }
 
     /**
@@ -118,5 +128,6 @@ final class Plugin
         $this->adminMenu->register();
         $this->webhookHandler->register();
         $this->elementorFormsBridge->register();
+        $this->analyticsApiHandler->register();
     }
 }

@@ -71,6 +71,21 @@ final class SettingsManager
     public const OPTION_FORM_OVERRIDES = 'FWI_form_overrides';
 
     /**
+     * WordPress option key: how many months of log rows to retain before purging.
+     */
+    public const OPTION_LOG_RETENTION_MONTHS = 'FWI_log_retention_months';
+
+    /**
+     * WordPress option key: whether the read-only analytics REST API is active.
+     */
+    public const OPTION_ANALYTICS_API_ACTIVE = 'FWI_analytics_api_active';
+
+    /**
+     * WordPress option key: the bearer token required by the analytics REST API.
+     */
+    public const OPTION_ANALYTICS_API_KEY = 'FWI_analytics_api_key';
+
+    /**
      * Returns whether the webhook integration is currently active.
      *
      * @return bool True when the webhook hook is registered; false when disabled.
@@ -238,6 +253,65 @@ final class SettingsManager
     }
 
     /**
+     * Returns whether the read-only analytics REST API is currently active.
+     *
+     * @return bool
+     */
+    public function isAnalyticsApiActive(): bool
+    {
+        return (bool) get_option(self::OPTION_ANALYTICS_API_ACTIVE, false);
+    }
+
+    /**
+     * Persists the analytics API active state.
+     *
+     * @param bool $active
+     *
+     * @return void
+     */
+    public function setAnalyticsApiActive(bool $active): void
+    {
+        update_option(self::OPTION_ANALYTICS_API_ACTIVE, $active);
+    }
+
+    /**
+     * Returns the stored analytics API key, or an empty string if none has been
+     * generated yet.
+     *
+     * @return string
+     */
+    public function getAnalyticsApiKey(): string
+    {
+        return (string) get_option(self::OPTION_ANALYTICS_API_KEY, '');
+    }
+
+    /**
+     * Generates a new 40-character alphanumeric API key, persists it, and
+     * returns it.
+     *
+     * @return string The newly-generated key.
+     */
+    public function generateAnalyticsApiKey(): string
+    {
+        $key = wp_generate_password(40, false);
+        update_option(self::OPTION_ANALYTICS_API_KEY, $key);
+        return $key;
+    }
+
+    /**
+     * Returns the number of months log rows are retained before being purged.
+     *
+     * Clamped to the range 1–24. Defaults to 3 when unset.
+     *
+     * @return int
+     */
+    public function getLogRetentionMonths(): int
+    {
+        $value = (int) get_option(self::OPTION_LOG_RETENTION_MONTHS, 3);
+        return max(1, min(24, $value));
+    }
+
+    /**
      * Persists the outcome of a webhook connectivity test to the options table.
      *
      * @param bool   $success    True when the endpoint returned 200 or 201.
@@ -299,6 +373,9 @@ final class SettingsManager
             self::OPTION_BLOCK_OUTSIDE_US,
             isset($data['fwi_block_outside_us']) && $data['fwi_block_outside_us'] === '1'
         );
+
+        $retentionMonths = isset($data['fwi_log_retention_months']) ? (int) $data['fwi_log_retention_months'] : 3;
+        update_option(self::OPTION_LOG_RETENTION_MONTHS, max(1, min(24, $retentionMonths)));
 
         $queryParams = [];
         if (!empty($data['fwi_query_params']) && is_array($data['fwi_query_params'])) {

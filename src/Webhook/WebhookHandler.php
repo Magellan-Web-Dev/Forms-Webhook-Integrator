@@ -126,9 +126,14 @@ final class WebhookHandler
         // Add form name
         $form_data['form_name'] = $form_name;
 
-        // Sanitize and store submission fields
+        // Sanitize and store submission fields, preserving array structure for
+        // multi-value fields such as checkbox groups.
         foreach ($fields as $key => $value) {
-            $form_data['submission_data'][$key] = sanitize_text_field((string) $value);
+            if (is_array($value)) {
+                $form_data['submission_data'][$key] = array_map('sanitize_text_field', array_map('strval', $value));
+            } else {
+                $form_data['submission_data'][$key] = sanitize_text_field((string) $value);
+            }
         }
 
         // Attempt to get user IP address
@@ -250,7 +255,8 @@ final class WebhookHandler
         // Log the response body for non-successful responses to aid debugging, but not for successful ones to avoid log clutter. The full response is still logged in all cases.
         $response_code = (int) wp_remote_retrieve_response_code($response);
 
-        // Consider 200 and 201 as successful responses; anything else (including 202, 204, etc.) is a failure for our purposes since it likely means the webhook did not process the data as intended. Transport-level errors are also failures (response_code = 0).
+        // 200, 201, 202, and 204 are all treated as success; anything else is a failure.
+        // Transport-level errors are also failures (response_code = 0).
         $ok_response = $response_code === 200 || $response_code === 201 || $response_code === 202 || $response_code === 204;
 
         // Log non-successful responses for debugging

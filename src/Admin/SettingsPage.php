@@ -309,6 +309,24 @@ final class SettingsPage
                             </td>
                         </tr>
 
+                        <!-- Log Retention -->
+                        <tr>
+                            <th scope="row">
+                                <label for="fwi_log_retention_months">Log Retention</label>
+                            </th>
+                            <td>
+                                <?php $retention = $this->settingsManager->getLogRetentionMonths(); ?>
+                                <select id="fwi_log_retention_months" name="fwi_log_retention_months">
+                                    <?php foreach ([1, 3, 6, 12, 24] as $months): ?>
+                                        <option value="<?php echo $months; ?>" <?php selected($retention, $months); ?>>
+                                            <?php echo $months === 1 ? '1 month' : "{$months} months"; ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <p class="description">Log entries older than this are purged automatically each day.</p>
+                            </td>
+                        </tr>
+
                     </table>
                 </div>
 

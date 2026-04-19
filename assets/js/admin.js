@@ -510,120 +510,76 @@
         }
     }
 
-    // ── Analytics Pagination ──────────────────────────────────────────────────
+    // ── Analytics Pagination (AJAX) ──────────────────────────────────────────
 
     /**
-     * Initialises client-side month/year filtering and pagination for every
-     * accordion body that contains a .fwi-log-list on the analytics page.
+     * Wires each analytics accordion to load its log list on demand via the
+     * fwi_get_logs AJAX action.
      *
-     * For each such body the function:
-     *  1. Injects a controls bar (year filter, month filter, per-page selector)
-     *     above the list.
-     *  2. Injects a pagination bar (item count + page buttons) below the list.
-     *  3. Hides all items not on the current page; updates on every control change.
+     * On first open, the controls bar and list are injected and an AJAX fetch
+     * retrieves the first page. Filter and page changes trigger subsequent fetches.
+     * Delete buttons inside the list are handled via event delegation and trigger
+     * a re-fetch after a successful delete.
      */
     function initAnalyticsPagination() {
-        document.querySelectorAll('.fwi-accordion-body').forEach(function (body) {
-            const list = body.querySelector('.fwi-log-list');
-            if (!list) return;
+        document.querySelectorAll('.fwi-accordion').forEach(function (accordion) {
+            var header = accordion.querySelector('.fwi-accordion-header');
+            var body   = accordion.querySelector('.fwi-accordion-body');
+            if (!header || !body) return;
 
-            const items = Array.from(list.querySelectorAll('.fwi-log-item'));
-            if (items.length === 0) return;
+            var errorsOnly  = body.dataset.errorsOnly === '1';
+            var initialized = false;
+            var dirty       = false;
+            var state       = { page: 1, perPage: 10, search: '', year: '', month: '' };
 
-            // ── Derive unique years + months from data-date="YYYY-MM" ──────────
-            const dates  = new Set(items.map(function (el) { return el.dataset.date || ''; }).filter(Boolean));
-            const years  = Array.from(new Set(Array.from(dates).map(function (d) { return d.slice(0, 4); }))).sort().reverse();
-            const months = Array.from(new Set(Array.from(dates).map(function (d) { return d.slice(5, 7); }))).sort();
-
-            // ── Build and inject controls bar ─────────────────────────────────
-            const controls = document.createElement('div');
+            // Inject controls bar, list, and pagination container once.
+            var controls = document.createElement('div');
             controls.className = 'fwi-acc-controls';
-            controls.innerHTML = buildControlsHtml(years, months);
-            list.before(controls);
+            controls.innerHTML = buildControlsHtml([], []);
+            body.appendChild(controls);
 
-            // ── Build and inject pagination container ─────────────────────────
-            const paginationEl = document.createElement('div');
+            var list = document.createElement('ul');
+            list.className = 'fwi-log-list';
+            body.appendChild(list);
+
+            var paginationEl = document.createElement('div');
             paginationEl.className = 'fwi-pagination';
-            list.after(paginationEl);
+            body.appendChild(paginationEl);
 
-            // ── Per-accordion state ───────────────────────────────────────────
-            const state = { page: 1, perPage: 10, year: '', month: '', search: '' };
-
-            // ── Event listeners ───────────────────────────────────────────────
+            // ── Controls wiring ───────────────────────────────────────────────
             controls.querySelector('.fwi-filter-year').addEventListener('change', function () {
-                state.year  = this.value;
-                state.page  = 1;
-                render();
+                state.year = this.value; state.page = 1; fetchLogs();
             });
-
             controls.querySelector('.fwi-filter-month').addEventListener('change', function () {
-                state.month = this.value;
-                state.page  = 1;
-                render();
+                state.month = this.value; state.page = 1; fetchLogs();
             });
-
             controls.querySelector('.fwi-per-page').addEventListener('change', function () {
-                state.perPage = parseInt(this.value, 10);
-                state.page    = 1;
-                render();
+                state.perPage = parseInt(this.value, 10); state.page = 1; fetchLogs();
             });
-
             controls.querySelector('.fwi-search-input').addEventListener('input', function () {
-                state.search = this.value;
-                state.page   = 1;
-                render();
+                state.search = this.value; state.page = 1; fetchLogs();
             });
-
             controls.querySelector('.fwi-search-clear').addEventListener('click', function () {
                 controls.querySelector('.fwi-search-input').value = '';
-                state.search = '';
-                state.page   = 1;
-                render();
+                state.search = ''; state.page = 1; fetchLogs();
             });
 
-            // ── Helpers ───────────────────────────────────────────────────────
+            // ── Fetch on accordion open ───────────────────────────────────────
+            // initAccordions() fires first (registered earlier), so aria-expanded
+            // is already updated when this listener runs.
+            header.addEventListener('click', function () {
+                var isOpen = header.getAttribute('aria-expanded') === 'true';
+                if (isOpen && (!initialized || dirty)) {
+                    fetchLogs();
+                }
+            });
 
-            function getFilteredItems() {
-                return items.filter(function (item) {
-                    const date = item.dataset.date || '';
-                    if (state.year  && date.slice(0, 4) !== state.year)  return false;
-                    if (state.month && date.slice(5, 7) !== state.month) return false;
-                    if (state.search) {
-                        const needle    = state.search.toLowerCase();
-                        const haystack  = (item.dataset.requestSearch || '').toLowerCase();
-                        if (!haystack.includes(needle)) return false;
-                    }
-                    return true;
-                });
-            }
-
-            function render() {
-                const filtered   = getFilteredItems();
-                const total      = filtered.length;
-                const totalPages = Math.max(1, Math.ceil(total / state.perPage));
-
-                if (state.page > totalPages) state.page = totalPages;
-
-                const start = (state.page - 1) * state.perPage;
-                const end   = start + state.perPage;
-
-                // Show only items on the current page
-                items.forEach(function (item) { item.hidden = true; });
-                filtered.slice(start, end).forEach(function (item) { item.hidden = false; });
-
-                renderPagination(paginationEl, state.page, totalPages, total, state.perPage, function (p) {
-                    state.page = p;
-                    render();
-                });
-            }
-
-            // ── Delete log entry (event delegation) ───────────────────────────
+            // ── Delete via event delegation ───────────────────────────────────
             list.addEventListener('click', function (e) {
-                const btn = e.target.closest('.fwi-log-delete-btn');
+                var btn   = e.target.closest('.fwi-log-delete-btn');
                 if (!btn) return;
-
-                const li    = btn.closest('.fwi-log-item');
-                const logId = li ? li.dataset.logId : null;
+                var li    = btn.closest('.fwi-log-item');
+                var logId = li ? li.dataset.logId : null;
                 if (!logId) return;
 
                 if (!confirm('Delete this log entry? This cannot be undone.')) return;
@@ -631,18 +587,25 @@
                 btn.disabled    = true;
                 btn.textContent = '\u2026';
 
-                const formData = new FormData();
-                formData.append('action', 'fwi_delete_log');
-                formData.append('nonce',  (typeof FWI !== 'undefined' && FWI.deleteNonce) ? FWI.deleteNonce : '');
-                formData.append('log_id', logId);
+                var fd = new FormData();
+                fd.append('action', 'fwi_delete_log');
+                fd.append('nonce',  (typeof FWI !== 'undefined' && FWI.deleteNonce) ? FWI.deleteNonce : '');
+                fd.append('log_id', logId);
 
                 fetch((typeof FWI !== 'undefined' && FWI.ajaxUrl) ? FWI.ajaxUrl : ajaxurl, {
                     method: 'POST',
-                    body:   formData,
+                    body:   fd,
                 })
                 .then(function (res) { return res.json(); })
                 .then(function (response) {
                     if (response.success) {
+                        var badge = accordion.querySelector('.fwi-accordion-header .fwi-badge');
+                        if (badge) {
+                            var count = parseInt(badge.textContent, 10);
+                            if (!isNaN(count) && count > 0) badge.textContent = String(count - 1);
+                        }
+                        // Re-fetch current page; mark all other accordions dirty.
+                        fetchLogs();
                         document.dispatchEvent(new CustomEvent('fwi:log-deleted', { detail: { logId: logId } }));
                     } else {
                         btn.disabled    = false;
@@ -655,63 +618,100 @@
                 });
             });
 
-            // ── Listen for deletion events (fired by any accordion) ───────────
-            document.addEventListener('fwi:log-deleted', function (e) {
-                const deletedId = String(e.detail.logId);
-                const idx = items.findIndex(function (item) {
-                    return item.dataset.logId === deletedId;
-                });
-
-                if (idx === -1) return;
-
-                items[idx].remove();
-                items.splice(idx, 1);
-
-                render();
-
-                // Decrement the badge in this accordion's header
-                const accordion = body.closest('.fwi-accordion');
-                if (accordion) {
-                    const badge = accordion.querySelector('.fwi-accordion-header .fwi-badge');
-                    if (badge) {
-                        const count = parseInt(badge.textContent, 10);
-                        if (!isNaN(count) && count > 0) {
-                            badge.textContent = String(count - 1);
-                        }
-                    }
-                }
+            // Re-fetch if open when another accordion deletes an entry.
+            document.addEventListener('fwi:log-deleted', function () {
+                dirty = true;
+                if (header.getAttribute('aria-expanded') === 'true') fetchLogs();
             });
 
-            // Initial render
-            render();
+            // ── Core fetch ────────────────────────────────────────────────────
+            function fetchLogs() {
+                list.innerHTML        = '<li class="fwi-empty-msg">Loading\u2026</li>';
+                paginationEl.innerHTML = '';
+
+                var fd = new FormData();
+                fd.append('action',       'fwi_get_logs');
+                fd.append('nonce',        (typeof FWI !== 'undefined' && FWI.logsNonce)  ? FWI.logsNonce  : '');
+                fd.append('page',         state.page);
+                fd.append('per_page',     state.perPage);
+                fd.append('search',       state.search);
+                fd.append('filter_year',  state.year);
+                fd.append('filter_month', state.month);
+                fd.append('errors_only',  errorsOnly ? '1' : '0');
+
+                fetch((typeof FWI !== 'undefined' && FWI.ajaxUrl) ? FWI.ajaxUrl : ajaxurl, {
+                    method: 'POST',
+                    body:   fd,
+                })
+                .then(function (res) { return res.json(); })
+                .then(function (resp) {
+                    if (!resp.success) {
+                        list.innerHTML = '<li class="fwi-empty-msg">Failed to load logs.</li>';
+                        return;
+                    }
+                    var data = resp.data;
+
+                    if (!initialized) {
+                        updateFilterOptions(controls, data.years || [], data.months || []);
+                        initialized = true;
+                    }
+                    dirty = false;
+
+                    list.innerHTML = data.html !== ''
+                        ? data.html
+                        : '<li class="fwi-empty-msg">' +
+                          (errorsOnly ? 'No errors recorded.' : 'No webhook requests have been made yet.') +
+                          '</li>';
+
+                    renderPagination(paginationEl, data.currentPage, data.totalPages, data.total, state.perPage, function (p) {
+                        state.page = p;
+                        fetchLogs();
+                    });
+                })
+                .catch(function () {
+                    list.innerHTML = '<li class="fwi-empty-msg">Failed to load logs.</li>';
+                });
+            }
+        });
+    }
+
+    /**
+     * Populates the year and month filter dropdowns from server-returned arrays.
+     *
+     * @param {HTMLElement} controls
+     * @param {string[]}    years    Unique years, newest first.
+     * @param {string[]}    months   Unique two-digit month strings, ascending.
+     */
+    function updateFilterOptions(controls, years, months) {
+        var MONTH_NAMES = ['January','February','March','April','May','June',
+                           'July','August','September','October','November','December'];
+
+        var yearSelect  = controls.querySelector('.fwi-filter-year');
+        var monthSelect = controls.querySelector('.fwi-filter-month');
+
+        yearSelect.innerHTML = '<option value="">All Years</option>';
+        years.forEach(function (y) {
+            yearSelect.innerHTML += '<option value="' + escapeHtml(y) + '">' + escapeHtml(y) + '</option>';
+        });
+
+        monthSelect.innerHTML = '<option value="">All Months</option>';
+        months.forEach(function (m) {
+            var name = MONTH_NAMES[parseInt(m, 10) - 1] || m;
+            monthSelect.innerHTML += '<option value="' + escapeHtml(m) + '">' + escapeHtml(name) + '</option>';
         });
     }
 
     /**
      * Returns the HTML string for the controls bar.
+     * Year/month options start empty; updateFilterOptions() fills them after
+     * the first AJAX response.
      *
-     * @param {string[]} years  Unique years, newest first.
-     * @param {string[]} months Unique two-digit month numbers, ascending.
      * @returns {string}
      */
-    function buildControlsHtml(years, months) {
-        const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
-                             'July', 'August', 'September', 'October', 'November', 'December'];
-
-        var yearOptions = '<option value="">All Years</option>';
-        years.forEach(function (y) {
-            yearOptions += '<option value="' + y + '">' + y + '</option>';
-        });
-
-        var monthOptions = '<option value="">All Months</option>';
-        months.forEach(function (m) {
-            var name = MONTH_NAMES[parseInt(m, 10) - 1] || m;
-            monthOptions += '<option value="' + m + '">' + name + '</option>';
-        });
-
+    function buildControlsHtml() {
         return '<div class="fwi-acc-filters">' +
-                   '<select class="fwi-filter-year">'  + yearOptions  + '</select>' +
-                   '<select class="fwi-filter-month">' + monthOptions + '</select>' +
+                   '<select class="fwi-filter-year"><option value="">All Years</option></select>' +
+                   '<select class="fwi-filter-month"><option value="">All Months</option></select>' +
                    '<div class="fwi-acc-search">' +
                        '<input type="text" class="fwi-search-input" placeholder="Search request data\u2026" />' +
                        '<button type="button" class="fwi-search-clear" aria-label="Clear search">\u2715</button>' +
@@ -813,6 +813,122 @@
         return pages;
     }
 
+    // ── Analytics API Toggle ─────────────────────────────────────────────────
+
+    /**
+     * Wires up the Analytics API toggle switch, copy-key button, and
+     * regenerate-key button on the analytics page.
+     */
+    function initAnalyticsApiToggle() {
+        var toggle   = document.getElementById('fwi-analytics-api-toggle');
+        var label    = document.getElementById('fwi-api-toggle-label');
+        var section  = document.getElementById('fwi-api-key-section');
+        var keyValue = document.getElementById('fwi-api-key-value');
+
+        if (!toggle) return;
+
+        // ── Toggle on/off ─────────────────────────────────────────────────
+        toggle.addEventListener('change', function () {
+            var active = toggle.checked;
+            toggle.disabled = true;
+
+            var fd = new FormData();
+            fd.append('action', 'fwi_toggle_analytics_api');
+            fd.append('nonce',  (typeof FWI !== 'undefined' && FWI.apiToggleNonce) ? FWI.apiToggleNonce : '');
+            fd.append('active', active ? '1' : '0');
+
+            fetch((typeof FWI !== 'undefined' && FWI.ajaxUrl) ? FWI.ajaxUrl : ajaxurl, {
+                method: 'POST',
+                body:   fd,
+            })
+            .then(function (res) { return res.json(); })
+            .then(function (resp) {
+                toggle.disabled = false;
+                if (resp.success) {
+                    if (label)   label.textContent = resp.data.active ? 'Active' : 'Inactive';
+                    if (section) section.hidden    = !resp.data.active;
+                    if (keyValue && resp.data.key) keyValue.textContent = resp.data.key;
+                } else {
+                    toggle.checked = !active; // revert on failure
+                }
+            })
+            .catch(function () {
+                toggle.disabled = false;
+                toggle.checked  = !active;
+            });
+        });
+
+        // ── Copy key ──────────────────────────────────────────────────────
+        var copyBtn = document.querySelector('.fwi-copy-key-btn');
+        if (copyBtn && keyValue) {
+            copyBtn.addEventListener('click', function () {
+                var key = keyValue.textContent.trim();
+                if (!key) return;
+
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(key).then(function () {
+                        var orig = copyBtn.textContent;
+                        copyBtn.textContent = 'Copied!';
+                        setTimeout(function () { copyBtn.textContent = orig; }, 2000);
+                    }).catch(function () { fallbackCopy(key, copyBtn); });
+                } else {
+                    fallbackCopy(key, copyBtn);
+                }
+            });
+        }
+
+        // ── Regenerate key ────────────────────────────────────────────────
+        var regenBtn = document.querySelector('.fwi-regen-key-btn');
+        if (regenBtn) {
+            regenBtn.addEventListener('click', function () {
+                if (!confirm('Regenerate the API key? Any existing integrations using the current key will stop working until updated.')) return;
+
+                regenBtn.disabled = true;
+
+                var fd = new FormData();
+                fd.append('action', 'fwi_regen_analytics_api_key');
+                fd.append('nonce',  (typeof FWI !== 'undefined' && FWI.apiRegenNonce) ? FWI.apiRegenNonce : '');
+
+                fetch((typeof FWI !== 'undefined' && FWI.ajaxUrl) ? FWI.ajaxUrl : ajaxurl, {
+                    method: 'POST',
+                    body:   fd,
+                })
+                .then(function (res) { return res.json(); })
+                .then(function (resp) {
+                    regenBtn.disabled = false;
+                    if (resp.success && keyValue) {
+                        keyValue.textContent = resp.data.key;
+                    }
+                })
+                .catch(function () {
+                    regenBtn.disabled = false;
+                });
+            });
+        }
+    }
+
+    /**
+     * Fallback clipboard copy using a temporary textarea.
+     *
+     * @param {string}      text
+     * @param {HTMLElement} btn  Button whose label is temporarily replaced.
+     */
+    function fallbackCopy(text, btn) {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0;';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        try {
+            document.execCommand('copy');
+            var orig = btn.textContent;
+            btn.textContent = 'Copied!';
+            setTimeout(function () { btn.textContent = orig; }, 2000);
+        } catch (_) {}
+        document.body.removeChild(ta);
+    }
+
     // ── Boot ─────────────────────────────────────────────────────────────────
 
     document.addEventListener('DOMContentLoaded', function () {
@@ -825,6 +941,7 @@
         initWebhookHeaders();
         initFormOverrideBuilders();
         initAnalyticsPagination();
+        initAnalyticsApiToggle();
     });
 
 })();

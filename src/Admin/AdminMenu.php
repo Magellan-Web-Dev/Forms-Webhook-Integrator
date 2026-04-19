@@ -51,7 +51,7 @@ final class AdminMenu
         private readonly SettingsManager $settingsManager
     ) {
         $this->settingsPage  = new SettingsPage($settingsManager);
-        $this->analyticsPage = new AnalyticsPage();
+        $this->analyticsPage = new AnalyticsPage($settingsManager);
         $this->webhookTester = new WebhookTester($settingsManager);
     }
 
@@ -67,8 +67,11 @@ final class AdminMenu
         add_action('admin_menu', [$this, 'addMenuPages']);
         add_action('admin_init', [$this, 'handleFormSubmissions']);
         add_action('admin_enqueue_scripts', [$this, 'enqueueAssets']);
-        add_action('wp_ajax_fwi_test_webhook', [$this, 'handleTestWebhookAjax']);
-        add_action('wp_ajax_fwi_delete_log',   [$this, 'handleDeleteLogAjax']);
+        add_action('wp_ajax_fwi_test_webhook',         [$this, 'handleTestWebhookAjax']);
+        add_action('wp_ajax_fwi_delete_log',           [$this, 'handleDeleteLogAjax']);
+        add_action('wp_ajax_fwi_get_logs',             [$this, 'handleGetLogsAjax']);
+        add_action('wp_ajax_fwi_toggle_analytics_api', [$this, 'handleApiToggleAjax']);
+        add_action('wp_ajax_fwi_regen_analytics_api_key', [$this, 'handleApiRegenKeyAjax']);
     }
 
     /**
@@ -155,6 +158,39 @@ final class AdminMenu
     }
 
     /**
+     * AJAX handler for paginated log fetching on the analytics page.
+     *
+     * Delegates to AnalyticsPage::handleGetLogsAjax() which owns the query and
+     * rendering logic.
+     *
+     * @return never
+     */
+    public function handleGetLogsAjax(): never
+    {
+        $this->analyticsPage->handleGetLogsAjax();
+    }
+
+    /**
+     * AJAX handler that toggles the analytics API active state.
+     *
+     * @return never
+     */
+    public function handleApiToggleAjax(): never
+    {
+        $this->analyticsPage->handleApiToggleAjax();
+    }
+
+    /**
+     * AJAX handler that regenerates the analytics API key.
+     *
+     * @return never
+     */
+    public function handleApiRegenKeyAjax(): never
+    {
+        $this->analyticsPage->handleApiRegenKeyAjax();
+    }
+
+    /**
      * AJAX handler for the per-entry delete button on the analytics page.
      *
      * Verifies the nonce and capability, then delegates to WebhookLogger::deleteLog().
@@ -215,9 +251,12 @@ final class AdminMenu
         );
 
         wp_localize_script('FWI-admin', 'FWI', [
-            'ajaxUrl'     => admin_url('admin-ajax.php'),
-            'testNonce'   => wp_create_nonce('fwi_test_webhook'),
-            'deleteNonce' => wp_create_nonce('fwi_delete_log'),
+            'ajaxUrl'      => admin_url('admin-ajax.php'),
+            'testNonce'    => wp_create_nonce('fwi_test_webhook'),
+            'deleteNonce'  => wp_create_nonce('fwi_delete_log'),
+            'logsNonce'    => wp_create_nonce('fwi_get_logs'),
+            'apiToggleNonce' => wp_create_nonce('fwi_toggle_analytics_api'),
+            'apiRegenNonce'  => wp_create_nonce('fwi_regen_analytics_api_key'),
         ]);
     }
 }

@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) exit;
  *
  * Table schema:
  *  - id            BIGINT(20) UNSIGNED  Auto-incrementing primary key.
- *  - success       TINYINT(1)           1 = response was 200 or 201, 0 = anything else.
+ *  - success       TINYINT(1)           1 = response was 200, 201, 202, or 204; 0 = anything else.
  *  - request_url   TEXT                 The fully-qualified webhook URL (base + query params)
  *                                       used for the request.
  *  - request_data  LONGTEXT             JSON payload sent to the webhook.
@@ -119,11 +119,11 @@ final class DatabaseManager
     }
 
     /**
-     * Deletes all log rows whose created_at timestamp is older than three months.
+     * Deletes all log rows whose created_at timestamp is older than the configured
+     * retention period. The retention duration is read from the FWI_log_retention_months
+     * option (default 3, range 1–24 months).
      *
-     * Intended to be called by a daily WP-Cron event (FWI_cleanup_old_logs)
-     * so the table does not grow unboundedly over time. Uses the site's local
-     * time via current_time() to stay consistent with how rows are inserted.
+     * Intended to be called by a daily WP-Cron event (FWI_cleanup_old_logs).
      *
      * @return void
      */
@@ -131,8 +131,9 @@ final class DatabaseManager
     {
         global $wpdb;
 
+        $months     = max(1, min(24, (int) get_option('FWI_log_retention_months', 3)));
         $tableName  = self::getTableName();
-        $cutoffDate = date('Y-m-d H:i:s', strtotime('-3 months', current_time('timestamp')));
+        $cutoffDate = gmdate('Y-m-d H:i:s', strtotime("-{$months} months", current_time('timestamp')));
 
         $wpdb->query(
             $wpdb->prepare(

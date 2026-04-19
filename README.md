@@ -102,7 +102,7 @@ Every webhook POST sends `Content-Type: application/json` with the following bod
 
 `submission_data` keys are the Elementor field IDs; values are sanitised strings. `client_location_data` is populated via a live lookup to [ipapi.co](https://ipapi.co). If the IP cannot be resolved, the block contains an `"error"` key instead of location fields.
 
-Only HTTP `200` and `201` responses are treated as success. Any other status code, or a transport-level error, is recorded as a failure.
+HTTP `200`, `201`, `202`, and `204` responses are treated as success. Any other status code, or a transport-level error, is recorded as a failure.
 
 ---
 
@@ -168,6 +168,83 @@ A daily WP-Cron event automatically purges log rows older than **3 months**, kee
 
 ---
 
+## Analytics REST API
+
+The plugin exposes a read-only REST endpoint that returns the same data as the **Export JSON** action on the Analytics page.
+
+**Route:** `GET /wp-json/fwi/v1/analytics`
+
+### Enabling the API
+
+On the **Webhook Integrator → Analytics** page, find the **Analytics API** card. Toggle the switch to **Active**. An API key is generated on first activation and displayed in the card. The endpoint returns `403` while the toggle is inactive.
+
+### Authentication
+
+Pass the API key as the value of the `Authorization` request header:
+
+```
+Authorization: <your-api-key>
+```
+
+The key can be regenerated at any time using the **Regenerate Key** button in the admin card. Regenerating immediately invalidates the previous key. A missing or incorrect key returns `401`.
+
+### Query Parameters
+
+| Parameter | Default | Maximum | Description |
+|---|---|---|---|
+| `page` | `1` | — | 1-based page number. Clamped to the last page if it exceeds the total. |
+| `per_page` | `25` | `100` | Number of entries to return per page. |
+
+### Response
+
+The response body is a JSON array. Each element matches the shape produced by **Export JSON**:
+
+```json
+[
+  {
+    "id": 42,
+    "created_at": "2025-04-15 14:32:00",
+    "success": true,
+    "form_name": "Contact Form",
+    "request_url": "https://hooks.example.com/webhook",
+    "response_code": 200,
+    "request_data": { "form_name": "Contact Form", "submission_data": { ... } },
+    "response_data": { ... }
+  }
+]
+```
+
+Pagination metadata is returned in response headers:
+
+| Header | Description |
+|---|---|
+| `X-WP-Total` | Total number of log entries |
+| `X-WP-TotalPages` | Total number of pages at the current `per_page` value |
+| `X-FWI-Page` | The page number returned in this response |
+
+### CORS
+
+Cross-origin requests are permitted from any origin. The endpoint adds the following headers to every response, including `OPTIONS` preflight requests:
+
+```
+Access-Control-Allow-Origin:   *
+Access-Control-Allow-Methods:  GET, OPTIONS
+Access-Control-Allow-Headers:  Authorization, Content-Type
+Access-Control-Expose-Headers: X-WP-Total, X-WP-TotalPages, X-FWI-Page
+Access-Control-Max-Age:        86400
+```
+
+`Access-Control-Expose-Headers` ensures that browser-based clients can read the pagination headers in cross-origin contexts.
+
+### Error Responses
+
+| Status | Code | Condition |
+|---|---|---|
+| `403` | `api_disabled` | The Analytics API toggle is inactive |
+| `401` | `unauthorized` | The `Authorization` header is missing or does not match the stored key |
+
+---
+
 ## Automatic Updates
 
 The plugin checks [GitHub Releases](https://github.com/Magellan-Web-Dev/Forms-Webhook-Integrator/releases) for new versions and integrates with the standard WordPress update pipeline.
@@ -205,6 +282,8 @@ forms-webhook-integrator/
     │   ├── AdminMenu.php          # Registers admin menu pages and AJAX handlers
     │   ├── SettingsPage.php       # Settings page render and form processing
     │   └── AnalyticsPage.php      # Analytics page render, export, and log-clear
+    ├── Api/
+    │   └── AnalyticsApiHandler.php  # REST API endpoint: GET /wp-json/fwi/v1/analytics
     ├── Database/
     │   └── DatabaseManager.php    # Table creation, schema upgrades, log purge
     ├── Forms/
@@ -229,9 +308,9 @@ The plugin creates a single custom table — `{prefix}FWI_webhook_logs` — on a
 | Column | Type | Description |
 |---|---|---|
 | `id` | `BIGINT UNSIGNED AUTO_INCREMENT` | Primary key |
-| `success` | `TINYINT(1)` | `1` for HTTP 200/201, `0` for everything else |
+| `success` | `TINYINT(1)` | `1` for HTTP 200/201/202/204, `0` for everything else |
 | `request_url` | `TEXT` | Full webhook URL including query string |
-| `request_headers` | `LONGTEXT` | JSON-encoded headers sent |
+| `request_headers` | `LONGTEXT` | JSON-encoded headers sent (not currently populated) |
 | `request_data` | `LONGTEXT` | JSON-encoded request payload |
 | `response_data` | `LONGTEXT` | Raw response body, or error JSON on transport failure |
 | `response_code` | `INT` | HTTP status code (`0` for transport errors) |
