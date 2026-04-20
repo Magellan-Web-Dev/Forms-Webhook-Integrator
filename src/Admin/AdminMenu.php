@@ -35,6 +35,13 @@ final class AdminMenu
     private readonly AnalyticsPage $analyticsPage;
 
     /**
+     * The about / documentation page renderer.
+     *
+     * @var AboutPage
+     */
+    private readonly AboutPage $aboutPage;
+
+    /**
      * Runs connectivity tests against the configured webhook endpoint.
      *
      * @var WebhookTester
@@ -53,6 +60,7 @@ final class AdminMenu
         $this->settingsPage  = new SettingsPage($settingsManager);
         $this->analyticsPage = new AnalyticsPage($settingsManager);
         $this->webhookTester = new WebhookTester($settingsManager);
+        $this->aboutPage     = new AboutPage();
     }
 
     /**
@@ -109,6 +117,15 @@ final class AdminMenu
             capability:  'manage_options',
             menu_slug:   'FWI-analytics',
             callback:    [$this->analyticsPage, 'render']
+        );
+
+        add_submenu_page(
+            parent_slug: 'FWI-settings',
+            page_title:  'About',
+            menu_title:  'About',
+            capability:  'manage_options',
+            menu_slug:   'FWI-about',
+            callback:    [$this->aboutPage, 'render']
         );
     }
 
