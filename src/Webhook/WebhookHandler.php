@@ -54,9 +54,7 @@ final class WebhookHandler
      */
     public function register(): void
     {
-        if ($this->settings->isActive()) {
-            add_action('fwi_submission', [$this, 'handleFormSubmission'], 10, 4);
-        }
+        add_action('fwi_submission', [$this, 'handleFormSubmission'], 10, 4);
     }
 
     /**
@@ -69,14 +67,15 @@ final class WebhookHandler
      * value, which is fine for integrations that do not need feedback.
      *
      * Execution flow:
-     *  1. Verify the form is not excluded.
-     *  2. Build the full webhook URL (base URL + configured query params).
-     *  3. Assemble the payload: website info, client data, sanitised fields,
+     *  1. Verify the webhook integration is active.
+     *  2. Verify the form is not excluded.
+     *  3. Build the full webhook URL (base URL + configured query params).
+     *  4. Assemble the payload: website info, client data, sanitised fields,
      *     IP geolocation via ipapi.co, and a timestamp.
-     *  4. If outside-US blocking is enabled and the submitter's country is not
+     *  5. If outside-US blocking is enabled and the submitter's country is not
      *     "United States", abort and return a failure result.
-     *  5. JSON-encode the payload and POST it to the webhook.
-     *  6. Log the outcome (success or failure) via WebhookLogger.
+     *  6. JSON-encode the payload and POST it to the webhook.
+     *  7. Log the outcome (success or failure) via WebhookLogger.
      *
      * @param string               $form_name       The name of the submitted form.
      * @param array<string, mixed> $fields          Associative array of field names to values.
@@ -95,6 +94,10 @@ final class WebhookHandler
      */
     public function handleFormSubmission(string $form_name, array $fields, array $url_query = [], array $request_headers = []): array
     {
+        if (!$this->settings->isActive()) {
+            return ['ok' => false, 'msg' => 'The webhook integration is not active.'];
+        }
+
         // Check if this form is excluded
         if (in_array($form_name, $this->settings->getExcludedForms(), true)) {
             return ['ok' => true, 'msg' => ''];

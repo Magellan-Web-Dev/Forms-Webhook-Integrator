@@ -130,7 +130,34 @@ do_action('fwi_submission', $form_name, $fields, $url_query, $request_headers);
 | `$url_query` | `array<string, mixed>` | Extra query parameters merged onto the webhook URL for this call only. |
 | `$request_headers` | `array<string, string>` | Extra headers merged after global and per-form headers for this call only. |
 
-> **Note:** WordPress discards return values from `do_action`. If you need to inspect the result (success/failure), call `WebhookHandler::handleFormSubmission()` directly the same way `ElementorFormsBridge` does.
+> **Note:** `do_action` discards return values. Use [`fwi_submit_form()`](#result-aware-helper-function) when you need to know whether the submission succeeded.
+
+---
+
+## Result-Aware Helper Function
+
+When the calling code needs to inspect the outcome, use `fwi_submit_form()` instead of `do_action`. It submits the form to the webhook and returns a result array:
+
+```php
+$result = fwi_submit_form($form_name, $fields);
+
+if (!$result['ok']) {
+    // $result['msg'] contains a user-facing error description
+}
+```
+
+`fwi_submit_form()` accepts the same four parameters as the action hook and respects the same active-state gate, exclusion list, and per-form overrides.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `$form_name` | `string` | The logical name of the form. |
+| `$fields` | `array<string, mixed>` | Associative array of field names/IDs to raw values. |
+| `$url_query` | `array<string, mixed>` | Optional extra query parameters for this call only. |
+| `$request_headers` | `array<string, string>` | Optional extra headers for this call only. |
+
+**Return value:** `array{ok: bool, msg: string}` — `ok` is `true` on success; `msg` holds the error description when `ok` is `false`, and an empty string on success.
+
+If the webhook integration is disabled in settings, `fwi_submit_form()` returns `['ok' => false, 'msg' => 'The webhook integration is not active.']` immediately without sending any request.
 
 ---
 

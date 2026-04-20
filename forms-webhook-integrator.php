@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Forms Webhook Integrator
  * Description: Integrates Elementor and other form submissions via an action hook with a configurable webhook endpoint, with admin settings and analytics.
- * Version:     1.4.0
+ * Version:     1.5.0
  * Requires PHP: 8.1
  * Author:      Chris Paschall
  * License:     GPL-2.0-or-later
@@ -13,10 +13,10 @@ if (!defined('ABSPATH')) exit;
 /**
  * PHP version guard.
  *
- * Must use PHP 5.x-compatible syntax because this code runs before the version
- * is confirmed. If the requirement is not met, an admin notice is registered and
- * the rest of the file is skipped via return so none of the PHP 8.1 code below
- * is parsed or executed.
+ * This file must not use PHP 8.1+ syntax directly. PHP parses the entire file
+ * before executing any branch, so 8.1+ syntax here would cause a fatal parse
+ * error on older runtimes before this guard ever runs. PHP 8.1+ code is safely
+ * isolated in the separately required files inside the else block below.
  */
 if (version_compare(PHP_VERSION, '8.1', '<')) {
     add_action('admin_notices', function () {
@@ -36,7 +36,7 @@ if (version_compare(PHP_VERSION, '8.1', '<')) {
  */
 } else {
 
-    define('FWI_VERSION', '1.4.0');
+    define('FWI_VERSION', '1.5.0');
     define('FWI_PLUGIN_FILE', __FILE__);
     define('FWI_PLUGIN_DIR', plugin_dir_path(__FILE__));
     define('FWI_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -74,4 +74,23 @@ if (version_compare(PHP_VERSION, '8.1', '<')) {
     add_action('plugins_loaded', static function (): void {
         FormsWebhookIntegrator\Plugin::getInstance()->init();
     });
+
+    /**
+     * Submit a form to the configured webhook and return the result.
+     *
+     * Use this when the caller needs to know whether the submission succeeded.
+     * For fire-and-forget integrations, use do_action('fwi_submission', ...) instead.
+     *
+     * @param string               $form_name       The name of the submitted form.
+     * @param array<string, mixed> $fields          Associative array of field names to values.
+     * @param array<string, mixed> $url_query       Optional extra query parameters appended to the webhook URL.
+     * @param array<string, string> $request_headers Optional extra request headers (key → value).
+     * @return array{ok: bool, msg: string} 'ok' is true on success; 'msg' holds the error description on failure.
+     */
+    function fwi_submit_form(string $form_name, array $fields, array $url_query = [], array $request_headers = []): array
+    {
+        return FormsWebhookIntegrator\Plugin::getInstance()
+            ->getWebhookHandler()
+            ->handleFormSubmission($form_name, $fields, $url_query, $request_headers);
+    }
 }

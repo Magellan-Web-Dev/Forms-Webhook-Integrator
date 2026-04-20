@@ -109,7 +109,7 @@ final class AboutPage
                 </table>
 
                 <div class="fwi-about-note">
-                    <strong>Note:</strong> WordPress discards return values from <code>do_action</code>. If you need to inspect the result (success / failure), call <code>WebhookHandler::handleFormSubmission()</code> directly the same way <code>ElementorFormsBridge</code> does.
+                    <strong>Note:</strong> WordPress discards return values from <code>do_action</code>. Use <code>fwi_submit_form()</code> (see below) when you need to know whether the submission succeeded.
                 </div>
 
                 <h3 class="fwi-about-subheading">Example — Custom Form Plugin</h3>
@@ -132,6 +132,34 @@ do_action(
     [ 'source' => 'footer-widget' ],     // extra query param for this call only
     [ 'X-Campaign' => 'spring-2025' ]    // extra header for this call only
 );</pre>
+            </div>
+
+            <!-- Result-Aware Helper -->
+            <div class="fwi-card">
+                <h2 class="fwi-card-title">Result-Aware Helper — <code>fwi_submit_form()</code></h2>
+                <p>
+                    When the calling code needs to inspect the outcome, use <code>fwi_submit_form()</code> instead of <code>do_action</code>.
+                    It submits the form to the webhook and returns an associative array indicating whether the submission succeeded:
+                </p>
+                <pre class="fwi-about-code">$result = fwi_submit_form( $form_name, $fields );
+
+if ( ! $result['ok'] ) {
+    // $result['msg'] contains a user-facing error description
+}</pre>
+                <p>It accepts the same four parameters as the action hook and respects the same active-state gate, exclusion list, and per-form overrides.</p>
+                <table class="fwi-about-table">
+                    <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+                    <tbody>
+                        <tr><td><code>$form_name</code></td><td><code>string</code></td><td>The logical name of the form.</td></tr>
+                        <tr><td><code>$fields</code></td><td><code>array&lt;string, mixed&gt;</code></td><td>Associative array of field names / IDs to raw values.</td></tr>
+                        <tr><td><code>$url_query</code></td><td><code>array&lt;string, mixed&gt;</code></td><td>Optional extra query parameters for this call only.</td></tr>
+                        <tr><td><code>$request_headers</code></td><td><code>array&lt;string, string&gt;</code></td><td>Optional extra headers for this call only.</td></tr>
+                    </tbody>
+                </table>
+                <p style="margin-top:12px;"><strong>Return value:</strong> <code>array{ ok: bool, msg: string }</code> — <code>ok</code> is <code>true</code> on success; <code>msg</code> holds the error description when <code>ok</code> is <code>false</code>, and an empty string on success.</p>
+                <div class="fwi-about-note">
+                    If the webhook integration is disabled in settings, <code>fwi_submit_form()</code> returns immediately with <code>ok: false</code> and does not send any request.
+                </div>
             </div>
 
             <!-- Analytics -->

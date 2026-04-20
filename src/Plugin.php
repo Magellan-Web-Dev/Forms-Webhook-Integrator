@@ -97,6 +97,20 @@ final class Plugin
     }
 
     /**
+     * Returns the WebhookHandler instance for result-aware direct submissions.
+     *
+     * Used by {@see fwi_submit_form()} so callers outside the plugin can invoke
+     * handleFormSubmission() and inspect its return value without going through
+     * do_action(), which discards return values.
+     *
+     * @return WebhookHandler
+     */
+    public function getWebhookHandler(): WebhookHandler
+    {
+        return $this->webhookHandler;
+    }
+
+    /**
      * Bootstraps all plugin subsystems by delegating to their register methods.
      *
      * Execution order:
