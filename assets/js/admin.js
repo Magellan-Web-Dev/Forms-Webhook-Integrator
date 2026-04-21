@@ -237,6 +237,10 @@
 
             if (toggleCard) {
                 toggleCard.style.display = hasUrl ? '' : 'none';
+                const checkbox = toggleCard.querySelector('input[type="checkbox"]');
+                if (checkbox) {
+                    checkbox.disabled = !hasUrl;
+                }
             }
 
             if (testBtn) {

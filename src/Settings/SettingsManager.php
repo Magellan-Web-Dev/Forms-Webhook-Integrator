@@ -352,12 +352,11 @@ final class SettingsManager
      */
     public function save(array $data): void
     {
-        update_option(self::OPTION_ACTIVE, !empty($data['fwi_active']));
+        $webhookUrl = esc_url_raw((string) ($data['fwi_webhook_url'] ?? ''));
+        update_option(self::OPTION_WEBHOOK_URL, $webhookUrl);
 
-        update_option(
-            self::OPTION_WEBHOOK_URL,
-            esc_url_raw((string) ($data['fwi_webhook_url'] ?? ''))
-        );
+        // Cannot be active without a URL — prevent silent data loss.
+        update_option(self::OPTION_ACTIVE, !empty($data['fwi_active']) && !empty($webhookUrl));
 
         update_option(
             self::OPTION_CLIENT_FIRST_NAME,

@@ -106,7 +106,7 @@ final class WebhookHandler
         // Build webhook URL (base URL + query params from settings, then caller-supplied params)
         $webhookUrl = $this->settings->buildWebhookUrl();
         if (empty($webhookUrl)) {
-            return ['ok' => true, 'msg' => ''];
+            return ['ok' => false, 'msg' => 'No webhook URL is configured.'];
         }
 
         if (!empty($url_query)) {

@@ -351,13 +351,31 @@ final class GitHubUpdater
             return $response;
         }
 
-        // Remove a stale correctly-named directory if one somehow exists.
+        // If a stale correctly-named directory exists, back it up so we can
+        // restore it if the rename below fails.
+        $backup_dir = null;
         if ($wp_filesystem->is_dir($desired_dir)) {
-            $wp_filesystem->delete($desired_dir, true);
+            $backup_dir = $desired_dir . '_fwi_backup';
+            if (!$wp_filesystem->move($desired_dir, $backup_dir)) {
+                // Can't move the stale dir out of the way — fall back to deleting it.
+                $wp_filesystem->delete($desired_dir, true);
+                $backup_dir = null;
+            }
         }
 
         // Move to the canonical folder name.
-        $wp_filesystem->move($installed_dir, $desired_dir);
+        if (!$wp_filesystem->move($installed_dir, $desired_dir)) {
+            // Rename failed; restore the backup so the plugin is not left missing.
+            if ($backup_dir && $wp_filesystem->is_dir($backup_dir)) {
+                $wp_filesystem->move($backup_dir, $desired_dir);
+            }
+            return $response;
+        }
+
+        // Rename succeeded — remove the backup.
+        if ($backup_dir && $wp_filesystem->is_dir($backup_dir)) {
+            $wp_filesystem->delete($backup_dir, true);
+        }
 
         wp_clean_plugins_cache(true);
 
