@@ -111,24 +111,24 @@ HTTP `200`, `201`, `202`, and `204` responses are treated as success. Any other 
 Any WordPress code — including third-party form plugins — can trigger the webhook without depending on Elementor:
 
 ```php
-do_action('fwi_submission', $form_name, $fields);
+do_action('fwi_submission', $formName, $fields);
 ```
 
 | Parameter | Type | Description |
 |---|---|---|
-| `$form_name` | `string` | The logical name of the form (used for exclusion checks and per-form overrides). |
+| `$formName` | `string` | The logical name of the form (used for exclusion checks and per-form overrides). |
 | `$fields` | `array<string, mixed>` | Associative array of field names/IDs to raw values. |
 
 The hook also accepts two optional parameters for runtime URL query params and headers:
 
 ```php
-do_action('fwi_submission', $form_name, $fields, $url_query, $request_headers);
+do_action('fwi_submission', $formName, $fields, $urlQuery, $requestHeaders);
 ```
 
 | Parameter | Type | Description |
 |---|---|---|
-| `$url_query` | `array<string, mixed>` | Extra query parameters merged onto the webhook URL for this call only. |
-| `$request_headers` | `array<string, string>` | Extra headers merged after global and per-form headers for this call only. |
+| `$urlQuery` | `array<string, mixed>` | Extra query parameters merged onto the webhook URL for this call only. |
+| `$requestHeaders` | `array<string, string>` | Extra headers merged after global and per-form headers for this call only. |
 
 > **Note:** `do_action` discards return values. Use [`fwi_submit_form()`](#result-aware-helper-function) when you need to know whether the submission succeeded.
 
@@ -136,13 +136,13 @@ do_action('fwi_submission', $form_name, $fields, $url_query, $request_headers);
 
 ## Result-Aware Helper Function
 
-When the calling code needs to inspect the outcome, use `fwi_submit_form()` instead of `do_action`. It submits the form to the webhook and returns a result array:
+When the calling code needs to inspect the outcome, use `fwi_submit_form()` instead of `do_action`. It submits the form to the webhook and returns a `WebhookResponse` object:
 
 ```php
-$result = fwi_submit_form($form_name, $fields);
+$result = fwi_submit_form($formName, $fields);
 
-if (!$result['ok']) {
-    // $result['msg'] contains a user-facing error description
+if (!$result->ok) {
+    // $result->msg contains a user-facing error description
 }
 ```
 
@@ -150,14 +150,23 @@ if (!$result['ok']) {
 
 | Parameter | Type | Description |
 |---|---|---|
-| `$form_name` | `string` | The logical name of the form. |
+| `$formName` | `string` | The logical name of the form. |
 | `$fields` | `array<string, mixed>` | Associative array of field names/IDs to raw values. |
-| `$url_query` | `array<string, mixed>` | Optional extra query parameters for this call only. |
-| `$request_headers` | `array<string, string>` | Optional extra headers for this call only. |
+| `$urlQuery` | `array<string, mixed>` | Optional extra query parameters for this call only. |
+| `$requestHeaders` | `array<string, string>` | Optional extra headers for this call only. |
 
-**Return value:** `array{ok: bool, msg: string}` — `ok` is `true` on success; `msg` holds the error description when `ok` is `false`, and an empty string on success.
+**Return value:** `WebhookResponse` — a read-only object with four properties:
 
-If the webhook integration is disabled in settings, `fwi_submit_form()` returns `['ok' => false, 'msg' => 'The webhook integration is not active.']` immediately without sending any request.
+| Property | Type | Description |
+|---|---|---|
+| `ok` | `bool` | `true` when the webhook accepted the submission (HTTP 200/201/202/204); `false` on any failure. |
+| `status` | `int` | HTTP status code returned by the webhook endpoint. `0` when no HTTP response was received (early exits, transport-level errors). |
+| `msg` | `string` | User-facing error description when `ok` is `false`; empty string on success. |
+| `data` | `mixed` | The webhook's response body when an HTTP response was received. JSON-decoded if the body is valid JSON, raw string otherwise. `null` for early exits (inactive integration, excluded form, missing URL, etc.) and transport-level errors. Not intended for public display. |
+
+Properties are readonly and cannot be modified after the object is created.
+
+If the webhook integration is disabled in settings, `fwi_submit_form()` returns a `WebhookResponse` with `ok: false`, `msg: 'The webhook integration is not active.'`, and `data: null` immediately without sending any request.
 
 ---
 
@@ -323,6 +332,7 @@ forms-webhook-integrator/
     └── Webhook/
         ├── WebhookHandler.php     # Builds payload, performs IP lookup, POSTs to webhook
         ├── WebhookLogger.php      # Inserts and retrieves log rows from the custom DB table
+        ├── WebhookResponse.php    # Readonly value object returned by handleFormSubmission()
         └── WebhookTester.php      # Sends lightweight test POST to the configured URL
 ```
 

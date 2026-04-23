@@ -87,8 +87,8 @@ final class ElementorFormsBridge
 
         $result = $this->webhookHandler->handleFormSubmission($form_name, $fields, $url_query, $req_headers);
 
-        if (!$result['ok']) {
-            $handler->add_error_message($result['msg']);
+        if (!$result->ok) {
+            $handler->add_error_message($result->msg);
             $handler->is_success = false;
         }
     }

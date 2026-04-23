@@ -18,8 +18,8 @@ use FormsWebhookIntegrator\Settings\SettingsManager;
  * All requests (successful and failed) are written to the log via WebhookLogger.
  *
  * External code can trigger a submission via:
- *   do_action('fwi_submission', $form_name, $form_fields);
- * where $form_name is a string and $form_fields is an associative array of
+ *   do_action('fwi_submission', $formName, $formFields);
+ * where $formName is a string and $formFields is an associative array of
  * field names to field values.
  */
 final class WebhookHandler
@@ -77,47 +77,50 @@ final class WebhookHandler
      *  6. JSON-encode the payload and POST it to the webhook.
      *  7. Log the outcome (success or failure) via WebhookLogger.
      *
-     * @param string               $form_name       The name of the submitted form.
+     * @param string               $formName        The name of the submitted form.
      * @param array<string, mixed> $fields          Associative array of field names to values.
-     * @param array<string, mixed> $url_query       Optional extra query parameters to append to
+     * @param array<string, mixed> $urlQuery        Optional extra query parameters to append to
      *                                              the webhook URL (merged after the base URL and
      *                                              settings-configured params are applied).
-     * @param array<string, string> $request_headers Optional extra request headers (key → value).
+     * @param array<string, string> $requestHeaders  Optional extra request headers (key → value).
      *                                              Merged after the settings-configured headers;
      *                                              caller-supplied values override settings values
      *                                              for any shared keys.
      *
-     * @return array{ok: bool, msg: string} 'ok' is true on success, false on any
-     *                                       failure. 'msg' contains a user-facing
-     *                                       error description when 'ok' is false,
-     *                                       and an empty string on success.
+     * @return WebhookResponse 'ok' is true on success, false on any failure.
+     *                          'status' is the HTTP response code (0 when no HTTP
+     *                          response was received). 'msg' contains a user-facing
+     *                          error description when 'ok' is false, and an empty
+     *                          string on success. 'data' holds the JSON-decoded (or
+     *                          raw) response body when an HTTP response was received;
+     *                          null otherwise.
      */
-    public function handleFormSubmission(string $form_name, array $fields, array $url_query = [], array $request_headers = []): array
+    public function handleFormSubmission(string $formName, array $fields, array $urlQuery = [], array $requestHeaders = []): WebhookResponse
     {
         if (!$this->settings->isActive()) {
-            return ['ok' => false, 'msg' => 'The webhook integration is not active.'];
+            return new WebhookResponse(ok: false, msg: 'The webhook integration is not active.');
         }
 
         // Check if this form is excluded
-        if (in_array($form_name, $this->settings->getExcludedForms(), true)) {
-            return ['ok' => true, 'msg' => ''];
+        if (in_array($formName, $this->settings->getExcludedForms(), true)) {
+            return new WebhookResponse(ok: true, msg: '');
         }
 
         // Build webhook URL (base URL + query params from settings, then caller-supplied params)
         $webhookUrl = $this->settings->buildWebhookUrl();
         if (empty($webhookUrl)) {
-            return ['ok' => false, 'msg' => 'No webhook URL is configured.'];
+            return new WebhookResponse(ok: false, msg: 'No webhook URL is configured.');
         }
 
-        if (!empty($url_query)) {
-            $webhookUrl = add_query_arg($url_query, $webhookUrl);
+        if (!empty($urlQuery)) {
+            $webhookUrl = add_query_arg($urlQuery, $webhookUrl);
         }
 
         // Initialize form data array
-        $form_data = [];
+        $formData = [];
 
         // Add website data
-        $form_data['website_info'] = [
+        $formData['website_info'] = [
             'name' => get_bloginfo('name'),
             'url'  => home_url(),
             'client' => [
@@ -127,15 +130,15 @@ final class WebhookHandler
         ];
 
         // Add form name
-        $form_data['form_name'] = $form_name;
+        $formData['form_name'] = $formName;
 
         // Sanitize and store submission fields, preserving array structure for
         // multi-value fields such as checkbox groups.
         foreach ($fields as $key => $value) {
             if (is_array($value)) {
-                $form_data['submission_data'][$key] = array_map('sanitize_text_field', array_map('strval', $value));
+                $formData['submission_data'][$key] = array_map('sanitize_text_field', array_map('strval', $value));
             } else {
-                $form_data['submission_data'][$key] = sanitize_text_field((string) $value);
+                $formData['submission_data'][$key] = sanitize_text_field((string) $value);
             }
         }
 
@@ -153,64 +156,64 @@ final class WebhookHandler
         }
 
         // Add client location data
-        $client_key_name = 'client_location_data';
+        $clientKeyName = 'client_location_data';
 
         if ($ip) {
             // Handle multiple IP addresses (proxies) — take the first one
             $ip = trim(explode(',', $ip)[0]);
 
-            $ip_error_message = 'Unable to get client location information from the user IP address.';
-            $ip_url           = 'https://ipapi.co/' . $ip . '/json';
+            $ipErrorMessage = 'Unable to get client location information from the user IP address.';
+            $ipUrl          = 'https://ipapi.co/' . $ip . '/json';
 
-            $ip_lookup_request = wp_remote_get($ip_url);
+            $ipLookupRequest = wp_remote_get($ipUrl);
 
-            if (!is_wp_error($ip_lookup_request)) {
-                $ip_data    = wp_remote_retrieve_body($ip_lookup_request);
-                $ip_decoded = json_decode($ip_data, true);
+            if (!is_wp_error($ipLookupRequest)) {
+                $ipData    = wp_remote_retrieve_body($ipLookupRequest);
+                $ipDecoded = json_decode($ipData, true);
 
-                if (isset($ip_decoded['error'])) {
-                    $form_data[$client_key_name]['error'] = $ip_error_message;
+                if (isset($ipDecoded['error'])) {
+                    $formData[$clientKeyName]['error'] = $ipErrorMessage;
                 } else {
-                    $ip_keys_to_parse = ['city', 'region', 'region_code', 'country_name', 'postal', 'latitude', 'longitude', 'timezone'];
+                    $ipKeysToParse = ['city', 'region', 'region_code', 'country_name', 'postal', 'latitude', 'longitude', 'timezone'];
 
-                    foreach ($ip_keys_to_parse as $key) {
-                        if (isset($ip_decoded[$key])) {
+                    foreach ($ipKeysToParse as $key) {
+                        if (isset($ipDecoded[$key])) {
                             // Block submissions outside the US if the setting is enabled
                             if (
                                 $this->settings->isBlockOutsideUs() &&
                                 $key === 'country_name' &&
-                                $ip_decoded[$key] !== 'United States'
+                                $ipDecoded[$key] !== 'United States'
                             ) {
-                                return ['ok' => false, 'msg' => 'Form submissions cannot be made from a location outside of the United States.'];
+                                return new WebhookResponse(ok: false, msg: 'Form submissions cannot be made from a location outside of the United States.');
                             }
 
-                            $form_data[$client_key_name][$key] = sanitize_text_field($ip_decoded[$key]);
+                            $formData[$clientKeyName][$key] = sanitize_text_field($ipDecoded[$key]);
                         }
                     }
                 }
             } else {
-                $form_data[$client_key_name]['error'] = $ip_error_message;
+                $formData[$clientKeyName]['error'] = $ipErrorMessage;
             }
         } else {
             $ip = 'Unknown';
         }
 
         // Assign IP address field — value is 'Unknown' if it could not be acquired
-        $form_data[$client_key_name]['ip'] = $ip;
+        $formData[$clientKeyName]['ip'] = $ip;
 
         // Set timestamp
-        $form_data['timestamp'] = [
+        $formData['timestamp'] = [
             'date' => gmdate('Y-m-d'),
             'time' => gmdate('H:i:s'),
         ];
 
         // Convert form data to JSON
-        $json_data = json_encode($form_data);
+        $jsonData = json_encode($formData);
 
         // Check for JSON encoding errors
-        if ($json_data === false) {
+        if ($jsonData === false) {
             error_log('FWI JSON encoding error: ' . json_last_error_msg());
-            return ['ok' => false, 'msg' => 'There was an issue compiling the submission data to send to the webhook.'];
+            return new WebhookResponse(ok: false, msg: 'There was an issue compiling the submission data to send to the webhook.');
         }
 
         // Build headers — Content-Type first, then settings headers, then caller-supplied headers
@@ -222,7 +225,7 @@ final class WebhookHandler
             }
         }
 
-        foreach ($request_headers as $key => $value) {
+        foreach ($requestHeaders as $key => $value) {
             if (!empty($key)) {
                 $headers[$key] = $value;
             }
@@ -230,7 +233,7 @@ final class WebhookHandler
 
         // Setup POST request arguments
         $args = [
-            'body'    => $json_data,
+            'body'    => $jsonData,
             'headers' => $headers,
             'timeout' => 10,
         ];
@@ -239,52 +242,55 @@ final class WebhookHandler
         $response = wp_remote_post($webhookUrl, $args);
 
         if (is_wp_error($response)) {
-            $error_message = $response->get_error_message();
-            error_log('FWI Webhook error: ' . $error_message);
+            $errorMessage = $response->get_error_message();
+            error_log('FWI Webhook error: ' . $errorMessage);
 
             $this->logger->log(
-                requestData: $form_data,
+                requestData: $formData,
                 requestUrl: $webhookUrl,
                 responseCode: 0,
-                responseData: (string) wp_json_encode(['error' => $error_message])
+                responseData: (string) wp_json_encode(['error' => $errorMessage])
             );
 
-            return ['ok' => false, 'msg' => 'There was an issue submitting the form data through the webhook.'];
+            return new WebhookResponse(ok: false, msg: 'There was an issue submitting the form data through the webhook.');
         }
 
         // Check for successful response
-        $response_body = wp_remote_retrieve_body($response);
+        $responseBody = wp_remote_retrieve_body($response);
 
         // Log the response body for non-successful responses to aid debugging, but not for successful ones to avoid log clutter. The full response is still logged in all cases.
-        $response_code = (int) wp_remote_retrieve_response_code($response);
+        $responseCode = (int) wp_remote_retrieve_response_code($response);
+
+        // Decode the response body once; fall back to raw string if not valid JSON.
+        $decodedBody = !empty($responseBody) ? (json_decode($responseBody, true) ?? $responseBody) : null;
 
         // 200, 201, 202, and 204 are all treated as success; anything else is a failure.
-        // Transport-level errors are also failures (response_code = 0).
-        $ok_response = $response_code === 200 || $response_code === 201 || $response_code === 202 || $response_code === 204;
+        // Transport-level errors are also failures (responseCode = 0).
+        $okResponse = $responseCode === 200 || $responseCode === 201 || $responseCode === 202 || $responseCode === 204;
 
         // Log non-successful responses for debugging
-        if (!$ok_response) {
-            error_log('FWI Webhook response: ' . $response_body);
+        if (!$okResponse) {
+            error_log('FWI Webhook response: ' . $responseBody);
 
             $this->logger->log(
-                requestData: $form_data,
+                requestData: $formData,
                 requestUrl: $webhookUrl,
-                responseCode: $response_code,
-                responseData: $response_body
+                responseCode: $responseCode,
+                responseData: $responseBody
             );
 
-            return ['ok' => false, 'msg' => 'There was an issue submitting the form data through the webhook.'];
+            return new WebhookResponse(ok: false, status: $responseCode, msg: 'There was an issue submitting the form data through the webhook.', data: $decodedBody);
         }
 
         // Log successful request
         $this->logger->log(
-            requestData: $form_data,
+            requestData: $formData,
             requestUrl: $webhookUrl,
-            responseCode: $response_code,
-            responseData: $response_body
+            responseCode: $responseCode,
+            responseData: $responseBody
         );
 
         // Return success
-        return ['ok' => true, 'msg' => 'Successfully submitted form data through the webhook.'];
+        return new WebhookResponse(ok: true, status: $responseCode, msg: 'Successfully submitted form data through the webhook.', data: $decodedBody);
     }
 }

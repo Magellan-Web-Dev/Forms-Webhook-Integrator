@@ -89,22 +89,22 @@ final class AboutPage
                     Any WordPress code — including third-party form plugins — can trigger the webhook without depending on Elementor.
                     Call the action anywhere a form submission is processed:
                 </p>
-                <pre class="fwi-about-code">do_action( 'fwi_submission', $form_name, $fields );</pre>
+                <pre class="fwi-about-code">do_action( 'fwi_submission', $formName, $fields );</pre>
                 <table class="fwi-about-table">
                     <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
                     <tbody>
-                        <tr><td><code>$form_name</code></td><td><code>string</code></td><td>The logical name of the form — used for exclusion checks and per-form overrides.</td></tr>
+                        <tr><td><code>$formName</code></td><td><code>string</code></td><td>The logical name of the form — used for exclusion checks and per-form overrides.</td></tr>
                         <tr><td><code>$fields</code></td><td><code>array&lt;string, mixed&gt;</code></td><td>Associative array of field names / IDs to raw values. These become the <code>submission_data</code> keys in the payload.</td></tr>
                     </tbody>
                 </table>
 
                 <p style="margin-top:16px;">Two optional parameters allow runtime overrides for a single call:</p>
-                <pre class="fwi-about-code">do_action( 'fwi_submission', $form_name, $fields, $url_query, $request_headers );</pre>
+                <pre class="fwi-about-code">do_action( 'fwi_submission', $formName, $fields, $urlQuery, $requestHeaders );</pre>
                 <table class="fwi-about-table">
                     <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
                     <tbody>
-                        <tr><td><code>$url_query</code></td><td><code>array&lt;string, mixed&gt;</code></td><td>Extra query parameters merged onto the webhook URL for this call only.</td></tr>
-                        <tr><td><code>$request_headers</code></td><td><code>array&lt;string, string&gt;</code></td><td>Extra headers merged after global and per-form headers for this call only.</td></tr>
+                        <tr><td><code>$urlQuery</code></td><td><code>array&lt;string, mixed&gt;</code></td><td>Extra query parameters merged onto the webhook URL for this call only.</td></tr>
+                        <tr><td><code>$requestHeaders</code></td><td><code>array&lt;string, string&gt;</code></td><td>Extra headers merged after global and per-form headers for this call only.</td></tr>
                     </tbody>
                 </table>
 
@@ -118,7 +118,7 @@ do_action(
     'fwi_submission',
     'My Custom Contact Form',            // form name
     [                                    // field data
-        'first_name' => $first_name,
+        'first_name' => $firstName,
         'email'      => $email,
         'message'    => $message,
     ]
@@ -139,26 +139,35 @@ do_action(
                 <h2 class="fwi-card-title">Result-Aware Helper — <code>fwi_submit_form()</code></h2>
                 <p>
                     When the calling code needs to inspect the outcome, use <code>fwi_submit_form()</code> instead of <code>do_action</code>.
-                    It submits the form to the webhook and returns an associative array indicating whether the submission succeeded:
+                    It submits the form to the webhook and returns a <code>WebhookResponse</code> object with readonly <code>ok</code> and <code>msg</code> properties:
                 </p>
-                <pre class="fwi-about-code">$result = fwi_submit_form( $form_name, $fields );
+                <pre class="fwi-about-code">$result = fwi_submit_form( $formName, $fields );
 
-if ( ! $result['ok'] ) {
-    // $result['msg'] contains a user-facing error description
+if ( ! $result->ok ) {
+    // $result->msg contains a user-facing error description
 }</pre>
                 <p>It accepts the same four parameters as the action hook and respects the same active-state gate, exclusion list, and per-form overrides.</p>
                 <table class="fwi-about-table">
                     <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
                     <tbody>
-                        <tr><td><code>$form_name</code></td><td><code>string</code></td><td>The logical name of the form.</td></tr>
+                        <tr><td><code>$formName</code></td><td><code>string</code></td><td>The logical name of the form.</td></tr>
                         <tr><td><code>$fields</code></td><td><code>array&lt;string, mixed&gt;</code></td><td>Associative array of field names / IDs to raw values.</td></tr>
-                        <tr><td><code>$url_query</code></td><td><code>array&lt;string, mixed&gt;</code></td><td>Optional extra query parameters for this call only.</td></tr>
-                        <tr><td><code>$request_headers</code></td><td><code>array&lt;string, string&gt;</code></td><td>Optional extra headers for this call only.</td></tr>
+                        <tr><td><code>$urlQuery</code></td><td><code>array&lt;string, mixed&gt;</code></td><td>Optional extra query parameters for this call only.</td></tr>
+                        <tr><td><code>$requestHeaders</code></td><td><code>array&lt;string, string&gt;</code></td><td>Optional extra headers for this call only.</td></tr>
                     </tbody>
                 </table>
-                <p style="margin-top:12px;"><strong>Return value:</strong> <code>array{ ok: bool, msg: string }</code> — <code>ok</code> is <code>true</code> on success; <code>msg</code> holds the error description when <code>ok</code> is <code>false</code>, and an empty string on success.</p>
+                <p style="margin-top:12px;"><strong>Return value:</strong> <code>WebhookResponse</code> — a read-only object. Properties are readonly and cannot be modified after the object is created.</p>
+                <table class="fwi-about-table">
+                    <thead><tr><th>Property</th><th>Type</th><th>Description</th></tr></thead>
+                    <tbody>
+                        <tr><td><code>ok</code></td><td><code>bool</code></td><td><code>true</code> when the webhook accepted the submission (HTTP 200/201/202/204); <code>false</code> on any failure.</td></tr>
+                        <tr><td><code>status</code></td><td><code>int</code></td><td>HTTP status code returned by the webhook endpoint. <code>0</code> when no HTTP response was received (early exits, transport-level errors).</td></tr>
+                        <tr><td><code>msg</code></td><td><code>string</code></td><td>User-facing error description when <code>ok</code> is <code>false</code>; empty string on success.</td></tr>
+                        <tr><td><code>data</code></td><td><code>mixed</code></td><td>The webhook's response body when an HTTP response was received — JSON-decoded if valid JSON, raw string otherwise. <code>null</code> for early exits and transport-level errors. Not intended for public display.</td></tr>
+                    </tbody>
+                </table>
                 <div class="fwi-about-note">
-                    If the webhook integration is disabled in settings, <code>fwi_submit_form()</code> returns immediately with <code>ok: false</code> and does not send any request.
+                    If the webhook integration is disabled in settings, <code>fwi_submit_form()</code> returns immediately with <code>ok: false</code>, <code>msg</code> set to an error description, and <code>data: null</code> — no request is sent.
                 </div>
             </div>
 

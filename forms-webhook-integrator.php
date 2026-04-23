@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Forms Webhook Integrator
  * Description: Integrates Elementor and other form submissions via an action hook with a configurable webhook endpoint, with admin settings and analytics.
- * Version:     1.5.1
+ * Version:     1.6.0
  * Requires PHP: 8.1
  * Author:      Chris Paschall
  * License:     GPL-2.0-or-later
@@ -36,7 +36,7 @@ if (version_compare(PHP_VERSION, '8.1', '<')) {
  */
 } else {
 
-    define('FWI_VERSION', '1.5.1');
+    define('FWI_VERSION', '1.6.0');
     define('FWI_PLUGIN_FILE', __FILE__);
     define('FWI_PLUGIN_DIR', plugin_dir_path(__FILE__));
     define('FWI_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -85,9 +85,9 @@ if (version_compare(PHP_VERSION, '8.1', '<')) {
      * @param array<string, mixed> $fields          Associative array of field names to values.
      * @param array<string, mixed> $url_query       Optional extra query parameters appended to the webhook URL.
      * @param array<string, string> $request_headers Optional extra request headers (key → value).
-     * @return array{ok: bool, msg: string} 'ok' is true on success; 'msg' holds the error description on failure.
+     * @return \FormsWebhookIntegrator\Webhook\WebhookResponse Object with readonly 'ok' (bool) and 'msg' (string) properties.
      */
-    function fwi_submit_form(string $form_name, array $fields, array $url_query = [], array $request_headers = []): array
+    function fwi_submit_form(string $form_name, array $fields, array $url_query = [], array $request_headers = []): \FormsWebhookIntegrator\Webhook\WebhookResponse
     {
         return FormsWebhookIntegrator\Plugin::getInstance()
             ->getWebhookHandler()
