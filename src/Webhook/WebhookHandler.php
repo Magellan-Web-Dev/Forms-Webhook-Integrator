@@ -103,7 +103,7 @@ final class WebhookHandler
 
         // Check if this form is excluded
         if (in_array($formName, $this->settings->getExcludedForms(), true)) {
-            return new WebhookResponse(ok: true, msg: '');
+            return new WebhookResponse(ok: false, msg: 'This form is excluded from webhook submissions by the current settings.');
         }
 
         // Build webhook URL (base URL + query params from settings, then caller-supplied params)
