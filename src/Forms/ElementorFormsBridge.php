@@ -53,9 +53,10 @@ final class ElementorFormsBridge
      * Parses an Elementor form record and forwards it to the webhook handler.
      *
      * Extracts the form name and builds a flat associative array of field IDs
-     * to raw values, then calls handleFormSubmission() directly. On failure the
-     * Elementor Ajax handler is used to display the error to the user and mark
-     * the submission as unsuccessful.
+     * to raw values. Returns early without calling handleFormSubmission() if the
+     * form name is empty or if the form appears on the excluded-forms list. On
+     * failure the Elementor Ajax handler is used to display the error to the
+     * user and mark the submission as unsuccessful.
      *
      * @param mixed $record  Elementor_Form_Record instance. Typed as mixed because
      *                       Elementor Pro type declarations are not available at
@@ -68,24 +69,28 @@ final class ElementorFormsBridge
      */
     public function handleElementorSubmission(mixed $record, mixed $handler): void
     {
-        $form_name = $record->get_form_settings('form_name');
+        $formName = $record->get_form_settings('form_name');
 
-        if (empty($form_name)) {
+        if (empty($formName)) {
             return;
         }
 
-        $raw_fields = $record->get('fields');
+        $rawFields = $record->get('fields');
         $fields     = [];
 
-        foreach ($raw_fields as $id => $field) {
+        foreach ($rawFields as $id => $field) {
             $fields[$id] = $field['value'];
         }
 
-        $override    = $this->settings->getFormOverride($form_name);
-        $url_query   = array_column($override['query_params'], 'value', 'key');
-        $req_headers = array_column($override['headers'],      'value', 'key');
+        $override    = $this->settings->getFormOverride($formName);
+        $urlQuery    = array_column($override['query_params'], 'value', 'key');
+        $reqHeaders = array_column($override['headers'],      'value', 'key');
 
-        $result = $this->webhookHandler->handleFormSubmission($form_name, $fields, $url_query, $req_headers);
+        if (in_array($formName, $this->settings->getExcludedForms(), true)) {
+            return;
+        }
+
+        $result = $this->webhookHandler->handleFormSubmission($formName, $fields, $urlQuery, $reqHeaders);
 
         if (!$result->ok) {
             $handler->add_error_message($result->msg);
