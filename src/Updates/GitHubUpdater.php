@@ -205,7 +205,8 @@ final class GitHubUpdater
     /**
      * Displays an admin notice after a manual "Check for updates" action completes.
      *
-     * Shows whether a newer version is available or confirms the plugin is up to date.
+     * Shows whether a newer version is available, confirms the plugin is up to date,
+     * or warns when the GitHub release check could not be completed.
      *
      * @return void
      */
@@ -224,11 +225,15 @@ final class GitHubUpdater
                 esc_html($release['version']),
                 esc_url(self_admin_url('update-core.php'))
             );
-        } else {
+        } elseif ($release) {
             $msg = 'Forms Webhook Integrator: You are running the latest version.';
+        } else {
+            $msg = 'Forms Webhook Integrator: Could not check for updates. The GitHub repository or release API may be unavailable.';
         }
 
-        echo '<div class="notice notice-success is-dismissible"><p>' . wp_kses_post($msg) . '</p></div>';
+        $notice_class = $release ? 'notice-success' : 'notice-warning';
+
+        echo '<div class="notice ' . esc_attr($notice_class) . ' is-dismissible"><p>' . wp_kses_post($msg) . '</p></div>';
     }
 
     /**
