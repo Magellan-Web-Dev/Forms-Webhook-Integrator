@@ -385,6 +385,7 @@ final class SettingsPage
                             $formHeaders  = is_array($override['headers']      ?? null) ? $override['headers']      : [];
                             ?>
                             <div class="fwi-form-override">
+                                <input type="hidden" name="fwi_rendered_form_overrides[]" value="<?php echo esc_attr($formName); ?>">
                                 <h3 class="fwi-form-override-title"><?php echo esc_html($formName); ?></h3>
 
                                 <table class="form-table" role="presentation">

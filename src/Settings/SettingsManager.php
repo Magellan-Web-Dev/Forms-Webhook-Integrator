@@ -413,11 +413,20 @@ final class SettingsManager
         }
         update_option(self::OPTION_EXCLUDED_FORMS, $excludedForms);
 
-        // Preserve existing overrides for excluded forms (not present in POST) so
-        // their configuration survives while they are excluded and is restored when
-        // they are re-added to the active list.
-        $existingOverrides = $this->getFormOverrides();
+        // Track which form override blocks were actually rendered on the page so
+        // we can distinguish "intentionally cleared" from "excluded/not rendered."
+        $renderedForms = [];
+        if (!empty($data['fwi_rendered_form_overrides']) && is_array($data['fwi_rendered_form_overrides'])) {
+            foreach ($data['fwi_rendered_form_overrides'] as $name) {
+                $sanitized = sanitize_text_field((string) $name);
+                if ($sanitized !== '') {
+                    $renderedForms[$sanitized] = true;
+                }
+            }
+        }
 
+        // Parse submitted per-form overrides.
+        $postOverrides = [];
         if (!empty($data['fwi_form_overrides']) && is_array($data['fwi_form_overrides'])) {
             foreach ($data['fwi_form_overrides'] as $rawName => $override) {
                 $formName = sanitize_text_field((string) $rawName);
@@ -449,13 +458,23 @@ final class SettingsManager
                     }
                 }
 
-                $existingOverrides[$formName] = [
+                $postOverrides[$formName] = [
                     'query_params' => $queryParams,
                     'headers'      => $headers,
                 ];
             }
         }
 
-        update_option(self::OPTION_FORM_OVERRIDES, $existingOverrides);
+        // Start from existing overrides to preserve excluded/non-rendered forms,
+        // then apply rendered forms from POST (empty arrays clear them correctly).
+        $mergedOverrides = $this->getFormOverrides();
+        foreach ($renderedForms as $formName => $_) {
+            $mergedOverrides[$formName] = $postOverrides[$formName] ?? [
+                'query_params' => [],
+                'headers'      => [],
+            ];
+        }
+
+        update_option(self::OPTION_FORM_OVERRIDES, $mergedOverrides);
     }
 }
