@@ -239,7 +239,7 @@ final class WebhookHandler
         ];
 
         // Make HTTP POST request to the webhook
-        $response = wp_remote_post($webhookUrl, $args);
+        $response = wp_safe_remote_post($webhookUrl, $args);
 
         if (is_wp_error($response)) {
             $errorMessage = $response->get_error_message();

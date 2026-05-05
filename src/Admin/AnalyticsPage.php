@@ -445,18 +445,30 @@ final class AnalyticsPage
 
             fputcsv($output, [
                 (int) ($entry['id'] ?? 0),
-                (string) ($entry['created_at'] ?? ''),
+                $this->escapeCsvCell((string) ($entry['created_at'] ?? '')),
                 (int) ($entry['success'] ?? 0) === 1 ? 'Yes' : 'No',
-                $formName,
-                (string) ($entry['request_url'] ?? ''),
+                $this->escapeCsvCell($formName),
+                $this->escapeCsvCell((string) ($entry['request_url'] ?? '')),
                 (int) ($entry['response_code'] ?? 0),
-                (string) ($entry['request_data'] ?? ''),
-                (string) ($entry['response_data'] ?? ''),
+                $this->escapeCsvCell((string) ($entry['request_data'] ?? '')),
+                $this->escapeCsvCell((string) ($entry['response_data'] ?? '')),
             ]);
         }
 
         fclose($output);
         exit;
+    }
+
+    /**
+     * Prefixes spreadsheet-formula trigger characters so Excel/Sheets treat the
+     * value as text rather than a formula.
+     */
+    private function escapeCsvCell(string $value): string
+    {
+        if ($value !== '' && in_array($value[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
+            return "\t" . $value;
+        }
+        return $value;
     }
 
     /**

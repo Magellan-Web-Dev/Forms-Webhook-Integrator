@@ -353,6 +353,9 @@ final class SettingsManager
     public function save(array $data): void
     {
         $webhookUrl = esc_url_raw((string) ($data['fwi_webhook_url'] ?? ''));
+        if (!empty($webhookUrl) && !wp_http_validate_url($webhookUrl)) {
+            $webhookUrl = '';
+        }
         update_option(self::OPTION_WEBHOOK_URL, $webhookUrl);
 
         // Cannot be active without a URL — prevent silent data loss.

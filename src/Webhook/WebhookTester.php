@@ -53,7 +53,7 @@ final class WebhookTester
             }
         }
 
-        $response = wp_remote_post($url, [
+        $response = wp_safe_remote_post($url, [
             'body'    => (string) wp_json_encode(['msg' => 'Webhook submission test', 'url' => home_url()]),
             'headers' => $headers,
             'timeout' => 10,

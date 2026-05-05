@@ -72,12 +72,27 @@
 
         const li = document.createElement('li');
         li.className = 'fwi-list-item';
-        li.innerHTML =
-            '<span class="fwi-item-label">' + escapeHtml(formName) + '</span>' +
-            '<input type="hidden" name="fwi_excluded_forms[]" value="' + escapeHtml(formName) + '">' +
-            '<button type="button" class="button fwi-remove-btn" aria-label="Remove ' + escapeHtml(formName) + '">Remove</button>';
 
-        li.querySelector('.fwi-remove-btn').addEventListener('click', function () {
+        const span = document.createElement('span');
+        span.className   = 'fwi-item-label';
+        span.textContent = formName;
+
+        const input = document.createElement('input');
+        input.type  = 'hidden';
+        input.name  = 'fwi_excluded_forms[]';
+        input.value = formName;
+
+        const button = document.createElement('button');
+        button.type      = 'button';
+        button.className = 'button fwi-remove-btn';
+        button.setAttribute('aria-label', 'Remove ' + formName);
+        button.textContent = 'Remove';
+
+        li.appendChild(span);
+        li.appendChild(input);
+        li.appendChild(button);
+
+        button.addEventListener('click', function () {
             li.remove();
             checkExcludedFormsEmpty(list);
         });

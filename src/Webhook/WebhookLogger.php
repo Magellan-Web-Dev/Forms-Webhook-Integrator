@@ -68,7 +68,7 @@ final class WebhookLogger
             DatabaseManager::getTableName(),
             [
                 'success'       => in_array($responseCode, [200, 201, 202, 204], true) ? 1 : 0,
-                'request_url'   => $requestUrl,
+                'request_url'   => $this->redactSensitiveUrl($requestUrl),
                 'request_data'  => $encoded,
                 'response_data' => $responseData,
                 'response_code' => $responseCode,
@@ -266,6 +266,44 @@ final class WebhookLogger
         }
 
         return $requestData;
+    }
+
+    /**
+     * Redacts query-string parameters whose names match sensitive field patterns
+     * so tokens embedded in webhook URLs are not persisted to the log table.
+     */
+    private function redactSensitiveUrl(string $url): string
+    {
+        $parts = wp_parse_url($url);
+        if (empty($parts['query'])) {
+            return $url;
+        }
+
+        parse_str($parts['query'], $params);
+        $redacted = false;
+        foreach ($params as $key => $value) {
+            $lower = strtolower((string) $key);
+            foreach (self::SENSITIVE_FIELD_PATTERNS as $pattern) {
+                if (str_contains($lower, $pattern)) {
+                    $params[$key] = '[REDACTED]';
+                    $redacted     = true;
+                    break;
+                }
+            }
+        }
+
+        if (!$redacted) {
+            return $url;
+        }
+
+        $scheme   = isset($parts['scheme'])   ? $parts['scheme'] . '://' : '';
+        $host     = $parts['host']   ?? '';
+        $port     = isset($parts['port'])     ? ':' . $parts['port']     : '';
+        $path     = $parts['path']   ?? '';
+        $query    = '?' . http_build_query($params);
+        $fragment = isset($parts['fragment']) ? '#' . $parts['fragment'] : '';
+
+        return $scheme . $host . $port . $path . $query . $fragment;
     }
 
     /**
