@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace FormsWebhookIntegrator\Admin;
+namespace FormsWebhookIntegrator\Admin\Pages;
 
 if (!defined('ABSPATH')) exit;
 

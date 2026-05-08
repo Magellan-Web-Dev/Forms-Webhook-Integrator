@@ -82,9 +82,17 @@ final class ElementorFormsBridge
             $fields[$id] = $field['value'];
         }
 
-        $override    = $this->settings->getFormOverride($formName);
-        $urlQuery    = array_column($override['query_params'], 'value', 'key');
+        $override   = $this->settings->getFormOverride($formName);
+        $urlQuery   = array_column($override['query_params'], 'value', 'key');
         $reqHeaders = array_column($override['headers'],      'value', 'key');
+
+        if ($this->settings->isIncludePageParams() || $override['include_page_params']) {
+            $pageParams = $this->extractPageParams();
+            if (!empty($pageParams)) {
+                // Page params merged first so form-specific params take precedence
+                $urlQuery = array_merge($pageParams, $urlQuery);
+            }
+        }
 
         if (in_array($formName, $this->settings->getExcludedForms(), true)) {
             return;
@@ -96,5 +104,39 @@ final class ElementorFormsBridge
             $handler->add_error_message($result->msg);
             $handler->is_success = false;
         }
+    }
+
+    /**
+     * Parses query parameters from the HTTP referrer (the page the form is on).
+     *
+     * Elementor forms submit via AJAX, so HTTP_REFERER reliably contains the
+     * originating page URL including any query string.
+     *
+     * @return array<string, string> Sanitised key-value pairs, or empty array.
+     */
+    private function extractPageParams(): array
+    {
+        $referer = $_SERVER['HTTP_REFERER'] ?? '';
+        if (empty($referer)) {
+            return [];
+        }
+
+        $parts = wp_parse_url($referer);
+        if (empty($parts['query'])) {
+            return [];
+        }
+
+        $rawParams = [];
+        wp_parse_str($parts['query'], $rawParams);
+
+        $params = [];
+        foreach ($rawParams as $key => $value) {
+            $cleanKey = sanitize_text_field((string) $key);
+            if ($cleanKey !== '') {
+                $params[$cleanKey] = sanitize_text_field((string) $value);
+            }
+        }
+
+        return $params;
     }
 }

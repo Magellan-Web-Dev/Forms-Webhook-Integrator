@@ -65,10 +65,15 @@ final class SettingsManager
      * WordPress option key: per-form URL query parameter and header overrides.
      *
      * Stored as an associative array keyed by form name, where each value is an
-     * array with 'query_params' and 'headers' sub-arrays (each containing the
-     * standard {key, value} pair format used by the global settings).
+     * array with 'query_params', 'headers', and 'include_page_params' sub-keys.
      */
     public const OPTION_FORM_OVERRIDES = 'FWI_form_overrides';
+
+    /**
+     * WordPress option key: whether URL parameters from the submitting page are
+     * appended to the webhook URL on every request (global default).
+     */
+    public const OPTION_INCLUDE_PAGE_PARAMS = 'FWI_include_page_params';
 
     /**
      * WordPress option key: how many months of log rows to retain before purging.
@@ -205,6 +210,17 @@ final class SettingsManager
     }
 
     /**
+     * Returns whether URL parameters from the submitting page should be appended
+     * to the webhook URL globally (applies to all forms).
+     *
+     * @return bool
+     */
+    public function isIncludePageParams(): bool
+    {
+        return (bool) get_option(self::OPTION_INCLUDE_PAGE_PARAMS, false);
+    }
+
+    /**
      * Returns all per-form URL query parameter and header overrides.
      *
      * The array is keyed by form name. Each value is an associative array with
@@ -226,7 +242,7 @@ final class SettingsManager
      *
      * @param string $formName The Elementor form name to look up.
      *
-     * @return array{query_params: array<int, array{key: string, value: string}>, headers: array<int, array{key: string, value: string}>}
+     * @return array{query_params: array<int, array{key: string, value: string}>, headers: array<int, array{key: string, value: string}>, include_page_params: bool}
      */
     public function getFormOverride(string $formName): array
     {
@@ -234,8 +250,9 @@ final class SettingsManager
         $entry     = $overrides[$formName] ?? [];
 
         return [
-            'query_params' => is_array($entry['query_params'] ?? null) ? $entry['query_params'] : [],
-            'headers'      => is_array($entry['headers']      ?? null) ? $entry['headers']      : [],
+            'query_params'        => is_array($entry['query_params'] ?? null) ? $entry['query_params'] : [],
+            'headers'             => is_array($entry['headers']      ?? null) ? $entry['headers']      : [],
+            'include_page_params' => (bool) ($entry['include_page_params'] ?? false),
         ];
     }
 
@@ -376,6 +393,11 @@ final class SettingsManager
             isset($data['fwi_block_outside_us']) && $data['fwi_block_outside_us'] === '1'
         );
 
+        update_option(
+            self::OPTION_INCLUDE_PAGE_PARAMS,
+            isset($data['fwi_include_page_params']) && $data['fwi_include_page_params'] === '1'
+        );
+
         $retentionMonths = isset($data['fwi_log_retention_months']) ? (int) $data['fwi_log_retention_months'] : 3;
         update_option(self::OPTION_LOG_RETENTION_MONTHS, max(1, min(24, $retentionMonths)));
 
@@ -462,8 +484,9 @@ final class SettingsManager
                 }
 
                 $postOverrides[$formName] = [
-                    'query_params' => $queryParams,
-                    'headers'      => $headers,
+                    'query_params'        => $queryParams,
+                    'headers'             => $headers,
+                    'include_page_params' => isset($override['include_page_params']) && $override['include_page_params'] === '1',
                 ];
             }
         }
@@ -473,8 +496,9 @@ final class SettingsManager
         $mergedOverrides = $this->getFormOverrides();
         foreach ($renderedForms as $formName => $_) {
             $mergedOverrides[$formName] = $postOverrides[$formName] ?? [
-                'query_params' => [],
-                'headers'      => [],
+                'query_params'        => [],
+                'headers'             => [],
+                'include_page_params' => false,
             ];
         }
 

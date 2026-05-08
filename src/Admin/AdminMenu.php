@@ -5,6 +5,9 @@ namespace FormsWebhookIntegrator\Admin;
 
 if (!defined('ABSPATH')) exit;
 
+use FormsWebhookIntegrator\Admin\Pages\AboutPage;
+use FormsWebhookIntegrator\Admin\Pages\AnalyticsPage;
+use FormsWebhookIntegrator\Admin\Pages\SettingsPage;
 use FormsWebhookIntegrator\Settings\SettingsManager;
 use FormsWebhookIntegrator\Webhook\WebhookTester;
 

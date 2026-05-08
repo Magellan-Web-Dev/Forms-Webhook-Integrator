@@ -121,12 +121,13 @@ final class WebhookHandler
 
         // Add website data
         $formData['website_info'] = [
-            'name' => get_bloginfo('name'),
-            'url'  => home_url(),
+            'name'   => get_bloginfo('name'),
+            'url'    => home_url(),
             'client' => [
                 'first_name' => $this->settings->getClientFirstName(),
                 'last_name'  => $this->settings->getClientLastName(),
             ],
+            'page'   => $this->buildPageInfo(),
         ];
 
         // Add form name
@@ -292,5 +293,49 @@ final class WebhookHandler
 
         // Return success
         return new WebhookResponse(ok: true, status: $responseCode, msg: 'Successfully submitted form data through the webhook.', data: $decodedBody);
+    }
+
+    /**
+     * Builds page info from the HTTP referrer: the clean URL (no query string)
+     * and an associative array of any query parameters that were present.
+     *
+     * Elementor forms submit via AJAX, so HTTP_REFERER reliably contains the
+     * originating page URL. For submissions via do_action('fwi_submission')
+     * the referer reflects whatever page triggered the server request.
+     *
+     * @return array{url: string, query: array<string, string>}
+     */
+    private function buildPageInfo(): array
+    {
+        $referer = $_SERVER['HTTP_REFERER'] ?? '';
+
+        if (empty($referer)) {
+            return ['url' => '', 'query' => []];
+        }
+
+        $parts = wp_parse_url($referer);
+
+        $pageUrl  = ($parts['scheme'] ?? '') . '://' . ($parts['host'] ?? '');
+        if (!empty($parts['port'])) {
+            $pageUrl .= ':' . $parts['port'];
+        }
+        $pageUrl .= ($parts['path'] ?? '');
+
+        $query = [];
+        if (!empty($parts['query'])) {
+            $rawParams = [];
+            wp_parse_str($parts['query'], $rawParams);
+            foreach ($rawParams as $key => $value) {
+                $cleanKey = sanitize_text_field((string) $key);
+                if ($cleanKey !== '') {
+                    $query[$cleanKey] = sanitize_text_field((string) $value);
+                }
+            }
+        }
+
+        return [
+            'url'   => esc_url_raw($pageUrl),
+            'query' => $query,
+        ];
     }
 }

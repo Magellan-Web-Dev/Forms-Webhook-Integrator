@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace FormsWebhookIntegrator\Admin;
+namespace FormsWebhookIntegrator\Admin\Pages;
 
 if (!defined('ABSPATH')) exit;
 
@@ -224,6 +224,18 @@ final class SettingsPage
                                 <p class="description" style="margin-bottom: 10px;">
                                     These key/value pairs are appended as a query string to the webhook URL on every request.
                                 </p>
+                                <label style="display:inline-flex;align-items:center;gap:6px;margin-bottom:10px;">
+                                    <input
+                                        type="checkbox"
+                                        name="fwi_include_page_params"
+                                        value="1"
+                                        <?php checked($this->settingsManager->isIncludePageParams(), true); ?>
+                                    >
+                                    Include URL parameters from the page where the form was submitted
+                                </label>
+                                <p class="description" style="margin-bottom:10px;">
+                                    When enabled, any URL parameters on the page (e.g. <code>?utm_source=google</code>) are automatically appended to the webhook URL for every form submission. Can also be set per-form below.
+                                </p>
                                 <div class="fwi-row-add">
                                     <input
                                         type="text"
@@ -380,15 +392,33 @@ final class SettingsPage
                         <div class="fwi-form-overrides-list">
                         <?php foreach ($activeForms as $formName): ?>
                             <?php
-                            $override     = $formOverrides[$formName] ?? [];
-                            $formQP       = is_array($override['query_params'] ?? null) ? $override['query_params'] : [];
-                            $formHeaders  = is_array($override['headers']      ?? null) ? $override['headers']      : [];
+                            $override              = $formOverrides[$formName] ?? [];
+                            $formQP                = is_array($override['query_params'] ?? null) ? $override['query_params'] : [];
+                            $formHeaders           = is_array($override['headers']      ?? null) ? $override['headers']      : [];
+                            $formIncludePageParams = (bool) ($override['include_page_params'] ?? false);
                             ?>
                             <div class="fwi-form-override">
                                 <input type="hidden" name="fwi_rendered_form_overrides[]" value="<?php echo esc_attr($formName); ?>">
                                 <h3 class="fwi-form-override-title"><?php echo esc_html($formName); ?></h3>
 
                                 <table class="form-table" role="presentation">
+
+                                    <!-- Per-form Include Page URL Parameters -->
+                                    <tr>
+                                        <th scope="row">Include Page URL Parameters</th>
+                                        <td>
+                                            <label style="display:inline-flex;align-items:center;gap:6px;">
+                                                <input
+                                                    type="checkbox"
+                                                    name="fwi_form_overrides[<?php echo esc_attr($formName); ?>][include_page_params]"
+                                                    value="1"
+                                                    <?php checked($formIncludePageParams, true); ?>
+                                                >
+                                                Append URL parameters from the page where this form was submitted
+                                            </label>
+                                            <p class="description">Enables page URL parameter passthrough for this form regardless of the global setting.</p>
+                                        </td>
+                                    </tr>
 
                                     <!-- Per-form URL Query Parameters -->
                                     <tr>

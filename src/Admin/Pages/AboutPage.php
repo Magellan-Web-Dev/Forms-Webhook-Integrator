@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace FormsWebhookIntegrator\Admin;
+namespace FormsWebhookIntegrator\Admin\Pages;
 
 if (!defined('ABSPATH')) exit;
 
@@ -37,10 +37,11 @@ final class AboutPage
                         <tr><td>Test Webhook</td><td>Sends a lightweight test payload (<code>{"msg":"Webhook submission test"}</code>) to the currently-typed URL and shows the HTTP response code inline.</td></tr>
                         <tr><td>Global Headers</td><td>Key/value HTTP headers included on every request, merged after <code>Content-Type: application/json</code>.</td></tr>
                         <tr><td>Global URL Query Parameters</td><td>Key/value pairs appended as a query string to the webhook URL on every request.</td></tr>
+                        <tr><td>Include Page URL Parameters</td><td>When enabled, any query parameters in the URL of the page where the form was submitted (e.g. <code>?utm_source=google</code>) are automatically appended to the webhook URL for every form submission. Can also be toggled per-form in the <em>Specific Form</em> section. Page params are merged after global params but before per-form params, so per-form values take the highest precedence.</td></tr>
                         <tr><td>Client First / Last Name</td><td>Embedded in the <code>website_info.client</code> block of every payload.</td></tr>
                         <tr><td>Block Outside US</td><td>Rejects submissions whose sender IP resolves to a non-US country before the webhook fires. Defaults to <em>Yes</em>.</td></tr>
                         <tr><td>Excluded Forms</td><td>Elementor form names that should never trigger the webhook. Per-form settings are preserved even while a form is excluded.</td></tr>
-                        <tr><td>Per-Form Overrides</td><td>Per-form URL query parameters and request headers that are merged on top of the global values for that form only.</td></tr>
+                        <tr><td>Per-Form Overrides</td><td>Per-form settings that are merged on top of the global values for that form only: an <em>Include Page URL Parameters</em> checkbox, additional URL query parameters, and additional request headers.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -53,7 +54,11 @@ final class AboutPage
   "website_info": {
     "name": "My Site",
     "url": "https://example.com",
-    "client": { "first_name": "Jane", "last_name": "Smith" }
+    "client": { "first_name": "Jane", "last_name": "Smith" },
+    "page": {
+      "url": "https://example.com/contact",
+      "query": { "utm_source": "google", "utm_medium": "cpc" }
+    }
   },
   "form_name": "Contact Form",
   "submission_data": {
@@ -76,6 +81,8 @@ final class AboutPage
 }</pre>
                 <p>
                     <code>submission_data</code> keys are the form field IDs; values are sanitised strings.
+                    <code>website_info.page.url</code> is the clean URL of the page the form was submitted from (no query string);
+                    <code>website_info.page.query</code> is an associative array of any URL parameters that were present on that page — both derived from the HTTP referrer.
                     <code>client_location_data</code> is populated via a live lookup to <strong>ipapi.co</strong>.
                     If the IP cannot be resolved the block contains an <code>"error"</code> key instead.
                     HTTP <code>200</code>, <code>201</code>, <code>202</code>, and <code>204</code> are treated as success.
