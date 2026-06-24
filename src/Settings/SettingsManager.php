@@ -42,6 +42,12 @@ final class SettingsManager
     public const OPTION_CLIENT_LAST_NAME = 'FWI_client_last_name';
 
     /**
+     * WordPress option key: an optional website identifier embedded in the
+     * website_info block of every payload.
+     */
+    public const OPTION_WEBSITE_ID = 'FWI_website_id';
+
+    /**
      * WordPress option key: whether submissions from outside the US are blocked.
      */
     public const OPTION_BLOCK_OUTSIDE_US = 'FWI_block_outside_us';
@@ -170,6 +176,17 @@ final class SettingsManager
     }
 
     /**
+     * Returns the optional website identifier embedded in the website_info
+     * block of every payload.
+     *
+     * @return string The stored website ID, or an empty string if not configured.
+     */
+    public function getWebsiteId(): string
+    {
+        return (string) get_option(self::OPTION_WEBSITE_ID, '');
+    }
+
+    /**
      * Returns whether form submissions originating from outside the United States
      * should be blocked at the geolocation check.
      *
@@ -237,12 +254,13 @@ final class SettingsManager
     /**
      * Returns the URL query parameter and header overrides for a single form.
      *
-     * Always returns a well-typed array with 'query_params' and 'headers' keys so
-     * callers never need to guard against missing sub-keys.
+     * Always returns a well-typed array with 'query_params', 'headers',
+     * 'include_page_params', and 'form_id' keys so callers never need to guard
+     * against missing sub-keys.
      *
      * @param string $formName The Elementor form name to look up.
      *
-     * @return array{query_params: array<int, array{key: string, value: string}>, headers: array<int, array{key: string, value: string}>, include_page_params: bool}
+     * @return array{query_params: array<int, array{key: string, value: string}>, headers: array<int, array{key: string, value: string}>, include_page_params: bool, form_id: string}
      */
     public function getFormOverride(string $formName): array
     {
@@ -253,6 +271,7 @@ final class SettingsManager
             'query_params'        => is_array($entry['query_params'] ?? null) ? $entry['query_params'] : [],
             'headers'             => is_array($entry['headers']      ?? null) ? $entry['headers']      : [],
             'include_page_params' => (bool) ($entry['include_page_params'] ?? false),
+            'form_id'             => (string) ($entry['form_id'] ?? ''),
         ];
     }
 
@@ -389,6 +408,11 @@ final class SettingsManager
         );
 
         update_option(
+            self::OPTION_WEBSITE_ID,
+            sanitize_text_field((string) ($data['fwi_website_id'] ?? ''))
+        );
+
+        update_option(
             self::OPTION_BLOCK_OUTSIDE_US,
             isset($data['fwi_block_outside_us']) && $data['fwi_block_outside_us'] === '1'
         );
@@ -487,6 +511,7 @@ final class SettingsManager
                     'query_params'        => $queryParams,
                     'headers'             => $headers,
                     'include_page_params' => isset($override['include_page_params']) && $override['include_page_params'] === '1',
+                    'form_id'             => sanitize_text_field((string) ($override['form_id'] ?? '')),
                 ];
             }
         }
@@ -499,6 +524,7 @@ final class SettingsManager
                 'query_params'        => [],
                 'headers'             => [],
                 'include_page_params' => false,
+                'form_id'             => '',
             ];
         }
 

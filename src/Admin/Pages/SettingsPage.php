@@ -307,6 +307,23 @@ final class SettingsPage
                             </td>
                         </tr>
 
+                        <!-- Website ID -->
+                        <tr>
+                            <th scope="row">
+                                <label for="fwi_website_id">Website ID <span class="description">(optional)</span></label>
+                            </th>
+                            <td>
+                                <input
+                                    type="text"
+                                    id="fwi_website_id"
+                                    name="fwi_website_id"
+                                    value="<?php echo esc_attr($this->settingsManager->getWebsiteId()); ?>"
+                                    class="regular-text"
+                                >
+                                <p class="description">Sent as <code>website_info.id</code> in every webhook payload.</p>
+                            </td>
+                        </tr>
+
                         <!-- Block Outside US -->
                         <tr>
                             <th scope="row">
@@ -396,6 +413,7 @@ final class SettingsPage
                             $formQP                = is_array($override['query_params'] ?? null) ? $override['query_params'] : [];
                             $formHeaders           = is_array($override['headers']      ?? null) ? $override['headers']      : [];
                             $formIncludePageParams = (bool) ($override['include_page_params'] ?? false);
+                            $formId                = (string) ($override['form_id'] ?? '');
                             ?>
                             <div class="fwi-form-override">
                                 <input type="hidden" name="fwi_rendered_form_overrides[]" value="<?php echo esc_attr($formName); ?>">
@@ -417,6 +435,23 @@ final class SettingsPage
                                                 Append URL parameters from the page where this form was submitted
                                             </label>
                                             <p class="description">Enables page URL parameter passthrough for this form regardless of the global setting.</p>
+                                        </td>
+                                    </tr>
+
+                                    <!-- Per-form Form ID -->
+                                    <tr>
+                                        <th scope="row">
+                                            <label for="fwi_form_id_<?php echo esc_attr($formName); ?>">Form ID <span class="description">(optional)</span></label>
+                                        </th>
+                                        <td>
+                                            <input
+                                                type="text"
+                                                id="fwi_form_id_<?php echo esc_attr($formName); ?>"
+                                                name="fwi_form_overrides[<?php echo esc_attr($formName); ?>][form_id]"
+                                                value="<?php echo esc_attr($formId); ?>"
+                                                class="regular-text"
+                                            >
+                                            <p class="description">Sent as <code>form_id</code> alongside <code>form_name</code> in the webhook payload for this form only.</p>
                                         </td>
                                     </tr>
 

@@ -45,6 +45,7 @@ A toggle that enables or disables the webhook globally. The toggle is hidden unt
 | **Global URL Query Parameters** | Key/value pairs appended as a query string to the webhook URL on every request. Also includes an **Include Page URL Parameters** checkbox — when enabled, any query parameters present in the URL of the page where the form was submitted (e.g. `?utm_source=google&gclid=…`) are automatically appended to the webhook URL on every form submission. |
 | **Client First Name** | Embedded in the `website_info.client` block of every payload. |
 | **Client Last Name** | Embedded in the `website_info.client` block of every payload. |
+| **Website ID** | Optional identifier sent as `website_info.id` in every payload. Leave blank if not needed. |
 | **Block Submissions Outside US** | When set to **Yes**, any submission where the sender's IP resolves to a country other than the United States is rejected before the webhook fires. Defaults to **Yes**. |
 
 ### Excluded Forms
@@ -55,6 +56,7 @@ A list of Elementor form names that should **not** trigger the webhook even when
 
 Per-form overrides for URL query parameters and request headers. Each active (non-excluded) Elementor form is listed here with its own controls for:
 
+- **Form ID** — an optional identifier sent as `form_id` directly alongside `form_name` in the webhook payload for that form's submissions only.
 - **Include Page URL Parameters** — a checkbox that enables page URL parameter passthrough for this form only, regardless of the global setting. When enabled, query parameters from the page URL are appended to the webhook URL for that form's submissions.
 - **URL Query Parameters** — appended on top of the global query parameters for that form's requests only.
 - **Request Headers** — merged after the global headers for that form's requests only.
@@ -80,6 +82,7 @@ Every webhook POST sends `Content-Type: application/json` with the following bod
   "website_info": {
     "name": "My Site",
     "url": "https://example.com",
+    "id": "site-123",
     "client": {
       "first_name": "Jane",
       "last_name": "Smith"
@@ -93,6 +96,7 @@ Every webhook POST sends `Content-Type: application/json` with the following bod
     }
   },
   "form_name": "Contact Form",
+  "form_id": "contact-form-01",
   "submission_data": {
     "name": "John Doe",
     "email": "john@example.com",
@@ -116,7 +120,7 @@ Every webhook POST sends `Content-Type: application/json` with the following bod
 }
 ```
 
-`submission_data` keys are the Elementor field IDs; values are sanitised strings. `website_info.page.url` is the clean URL of the page the form was submitted from (no query string), and `website_info.page.query` is an associative array of any URL parameters that were present on that page — both derived from the HTTP referrer. `client_location_data` is populated via a live lookup to [ipapi.co](https://ipapi.co). If the IP cannot be resolved, the block contains an `"error"` key instead of location fields.
+`submission_data` keys are the Elementor field IDs; values are sanitised strings. `website_info.id` is the optional identifier configured in Webhook Settings (empty string when not set). `website_info.page.url` is the clean URL of the page the form was submitted from (no query string), and `website_info.page.query` is an associative array of any URL parameters that were present on that page — both derived from the HTTP referrer. `form_id` is an optional per-form identifier configured in the Specific Form URL Query And Headers section (empty string when not set). `client_location_data` is populated via a live lookup to [ipapi.co](https://ipapi.co). If the IP cannot be resolved, the block contains an `"error"` key instead of location fields.
 
 HTTP `200`, `201`, `202`, and `204` responses are treated as success. Any other status code, or a transport-level error, is recorded as a failure.
 

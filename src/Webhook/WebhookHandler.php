@@ -121,17 +121,19 @@ final class WebhookHandler
 
         // Add website data
         $formData['website_info'] = [
-            'name'   => get_bloginfo('name'),
-            'url'    => home_url(),
-            'client' => [
+            'name'       => get_bloginfo('name'),
+            'url'        => home_url(),
+            'id'         => $this->settings->getWebsiteId(),
+            'client'     => [
                 'first_name' => $this->settings->getClientFirstName(),
                 'last_name'  => $this->settings->getClientLastName(),
             ],
-            'page'   => $this->buildPageInfo(),
+            'page'       => $this->buildPageInfo(),
         ];
 
-        // Add form name
+        // Add form name and optional per-form identifier
         $formData['form_name'] = $formName;
+        $formData['form_id']   = $this->settings->getFormOverride($formName)['form_id'];
 
         // Sanitize and store submission fields, preserving array structure for
         // multi-value fields such as checkbox groups.
