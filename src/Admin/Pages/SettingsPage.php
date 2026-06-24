@@ -307,6 +307,23 @@ final class SettingsPage
                             </td>
                         </tr>
 
+                        <!-- Client ID -->
+                        <tr>
+                            <th scope="row">
+                                <label for="fwi_client_id">Client ID <span class="description">(optional)</span></label>
+                            </th>
+                            <td>
+                                <input
+                                    type="text"
+                                    id="fwi_client_id"
+                                    name="fwi_client_id"
+                                    value="<?php echo esc_attr($this->settingsManager->getClientId()); ?>"
+                                    class="regular-text"
+                                >
+                                <p class="description">Sent as <code>website_info.client.id</code> in every webhook payload.</p>
+                            </td>
+                        </tr>
+
                         <!-- Website ID -->
                         <tr>
                             <th scope="row">

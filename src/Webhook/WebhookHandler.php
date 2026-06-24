@@ -137,6 +137,7 @@ final class WebhookHandler
             'client'     => [
                 'first_name' => $this->settings->getClientFirstName(),
                 'last_name'  => $this->settings->getClientLastName(),
+                'id'         => $this->settings->getClientId(),
             ],
             'page'       => $this->buildPageInfo(),
         ];

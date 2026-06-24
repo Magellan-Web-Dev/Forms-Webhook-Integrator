@@ -42,6 +42,12 @@ final class SettingsManager
     public const OPTION_CLIENT_LAST_NAME = 'FWI_client_last_name';
 
     /**
+     * WordPress option key: an optional client identifier embedded in the
+     * website_info.client block of every payload.
+     */
+    public const OPTION_CLIENT_ID = 'FWI_client_id';
+
+    /**
      * WordPress option key: an optional website identifier embedded in the
      * website_info block of every payload.
      */
@@ -173,6 +179,17 @@ final class SettingsManager
     public function getClientLastName(): string
     {
         return (string) get_option(self::OPTION_CLIENT_LAST_NAME, '');
+    }
+
+    /**
+     * Returns the optional client identifier embedded in the website_info.client
+     * block of every payload.
+     *
+     * @return string The stored client ID, or an empty string if not configured.
+     */
+    public function getClientId(): string
+    {
+        return (string) get_option(self::OPTION_CLIENT_ID, '');
     }
 
     /**
@@ -405,6 +422,11 @@ final class SettingsManager
         update_option(
             self::OPTION_CLIENT_LAST_NAME,
             sanitize_text_field((string) ($data['fwi_client_last_name'] ?? ''))
+        );
+
+        update_option(
+            self::OPTION_CLIENT_ID,
+            sanitize_text_field((string) ($data['fwi_client_id'] ?? ''))
         );
 
         update_option(

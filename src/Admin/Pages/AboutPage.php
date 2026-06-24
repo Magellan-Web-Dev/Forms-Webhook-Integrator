@@ -39,6 +39,7 @@ final class AboutPage
                         <tr><td>Global URL Query Parameters</td><td>Key/value pairs appended as a query string to the webhook URL on every request.</td></tr>
                         <tr><td>Include Page URL Parameters</td><td>When enabled, any query parameters in the URL of the page where the form was submitted (e.g. <code>?utm_source=google</code>) are automatically appended to the webhook URL for every form submission. Can also be toggled per-form in the <em>Specific Form</em> section. Page params are merged after global params but before per-form params, so per-form values take the highest precedence.</td></tr>
                         <tr><td>Client First / Last Name</td><td>Embedded in the <code>website_info.client</code> block of every payload.</td></tr>
+                        <tr><td>Client ID</td><td>Optional identifier sent as <code>website_info.client.id</code> in every payload. Leave blank if not needed.</td></tr>
                         <tr><td>Website ID</td><td>Optional identifier sent as <code>website_info.id</code> in every payload.</td></tr>
                         <tr><td>Block Outside US</td><td>Rejects submissions whose sender IP resolves to a non-US country before the webhook fires. Defaults to <em>Yes</em>.</td></tr>
                         <tr><td>Excluded Forms</td><td>Elementor form names that should never trigger the webhook. Per-form settings are preserved even while a form is excluded.</td></tr>
@@ -56,7 +57,7 @@ final class AboutPage
     "name": "My Site",
     "url": "https://example.com",
     "id": "site-123",
-    "client": { "first_name": "Jane", "last_name": "Smith" },
+    "client": { "first_name": "Jane", "last_name": "Smith", "id": "client-456" },
     "page": {
       "url": "https://example.com/contact",
       "query": { "utm_source": "google", "utm_medium": "cpc" }
@@ -85,6 +86,7 @@ final class AboutPage
                 <p>
                     <code>submission_data</code> keys are the form field IDs; values are sanitised strings.
                     <code>website_info.id</code> is an optional identifier configured in Webhook Settings; it is always present in the payload (empty string when not set).
+                    <code>website_info.client.id</code> is an optional client identifier configured in Webhook Settings; it is always present in the payload (empty string when not set).
                     <code>website_info.page.url</code> is the clean URL of the page the form was submitted from (no query string);
                     <code>website_info.page.query</code> is an associative array of any URL parameters that were present on that page — both derived from the HTTP referrer.
                     <code>form_id</code> is an optional per-form identifier configured in the <em>Specific Form URL Query And Headers</em> section; it is always present (empty string when not set).
