@@ -98,7 +98,12 @@ final class ElementorFormsBridge
             return;
         }
 
-        $result = $this->webhookHandler->handleFormSubmission($formName, $fields, $urlQuery, $reqHeaders);
+        $result = $this->webhookHandler->handleFormSubmission(
+            ['form_name' => $formName, 'form_id' => ''],
+            $fields,
+            $urlQuery,
+            $reqHeaders
+        );
 
         if (!$result->ok) {
             $handler->add_error_message($result->msg);

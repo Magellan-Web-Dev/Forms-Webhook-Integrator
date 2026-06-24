@@ -131,18 +131,18 @@ HTTP `200`, `201`, `202`, and `204` responses are treated as success. Any other 
 Any WordPress code — including third-party form plugins — can trigger the webhook without depending on Elementor:
 
 ```php
-do_action('fwi_submission', $formName, $fields);
+do_action('fwi_submission', $formIdentifier, $fields);
 ```
 
 | Parameter | Type | Description |
 |---|---|---|
-| `$formName` | `string` | The logical name of the form (used for exclusion checks and per-form overrides). |
+| `$formIdentifier` | `array{form_name: string, form_id: string}` | Associative array identifying the form. `form_name` is used for exclusion checks and per-form overrides. `form_id` is the native form identifier supplied by the caller; it is used in the payload only when no `form_id` override is configured in settings. |
 | `$fields` | `array<string, mixed>` | Associative array of field names/IDs to raw values. |
 
 The hook also accepts two optional parameters for runtime URL query params and headers:
 
 ```php
-do_action('fwi_submission', $formName, $fields, $urlQuery, $requestHeaders);
+do_action('fwi_submission', $formIdentifier, $fields, $urlQuery, $requestHeaders);
 ```
 
 | Parameter | Type | Description |
@@ -159,7 +159,7 @@ do_action('fwi_submission', $formName, $fields, $urlQuery, $requestHeaders);
 When the calling code needs to inspect the outcome, use `fwi_submit_form()` instead of `do_action`. It submits the form to the webhook and returns a `WebhookResponse` object:
 
 ```php
-$result = fwi_submit_form($formName, $fields);
+$result = fwi_submit_form(['form_name' => $formName, 'form_id' => $formId], $fields);
 
 if (!$result->ok) {
     // $result->msg contains a user-facing error description
@@ -170,7 +170,7 @@ if (!$result->ok) {
 
 | Parameter | Type | Description |
 |---|---|---|
-| `$formName` | `string` | The logical name of the form. |
+| `$formIdentifier` | `array{form_name: string, form_id: string}` | Associative array with `form_name` and `form_id` keys identifying the form. |
 | `$fields` | `array<string, mixed>` | Associative array of field names/IDs to raw values. |
 | `$urlQuery` | `array<string, mixed>` | Optional extra query parameters for this call only. |
 | `$requestHeaders` | `array<string, string>` | Optional extra headers for this call only. |

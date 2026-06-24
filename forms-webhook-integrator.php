@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Forms Webhook Integrator
  * Description: Integrates Elementor and other form submissions via an action hook with a configurable webhook endpoint, with admin settings and analytics.
- * Version:     1.8.0
+ * Version:     1.8.1
  * Requires PHP: 8.1
  * Author:      Chris Paschall
  * License:     GPL-2.0-or-later
@@ -36,7 +36,7 @@ if (version_compare(PHP_VERSION, '8.1', '<')) {
  */
 } else {
 
-    define('FWI_VERSION', '1.8.0');
+    define('FWI_VERSION', '1.8.1');
     define('FWI_PLUGIN_FILE', __FILE__);
     define('FWI_PLUGIN_DIR', plugin_dir_path(__FILE__));
     define('FWI_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -81,16 +81,17 @@ if (version_compare(PHP_VERSION, '8.1', '<')) {
      * Use this when the caller needs to know whether the submission succeeded.
      * For fire-and-forget integrations, use do_action('fwi_submission', ...) instead.
      *
-     * @param string               $form_name       The name of the submitted form.
+     * @param array{form_name: string, form_id: string} $form_identifier
+     *                                              Associative array with 'form_name' and 'form_id' keys identifying the form.
      * @param array<string, mixed> $fields          Associative array of field names to values.
      * @param array<string, mixed> $url_query       Optional extra query parameters appended to the webhook URL.
      * @param array<string, string> $request_headers Optional extra request headers (key → value).
      * @return \FormsWebhookIntegrator\Webhook\WebhookResponse Object with readonly 'ok' (bool) and 'msg' (string) properties.
      */
-    function fwi_submit_form(string $form_name, array $fields, array $url_query = [], array $request_headers = []): \FormsWebhookIntegrator\Webhook\WebhookResponse
+    function fwi_submit_form(array $form_identifier, array $fields, array $url_query = [], array $request_headers = []): \FormsWebhookIntegrator\Webhook\WebhookResponse
     {
         return FormsWebhookIntegrator\Plugin::getInstance()
             ->getWebhookHandler()
-            ->handleFormSubmission($form_name, $fields, $url_query, $request_headers);
+            ->handleFormSubmission($form_identifier, $fields, $url_query, $request_headers);
     }
 }

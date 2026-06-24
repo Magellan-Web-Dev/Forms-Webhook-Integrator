@@ -101,17 +101,17 @@ final class AboutPage
                     Any WordPress code — including third-party form plugins — can trigger the webhook without depending on Elementor.
                     Call the action anywhere a form submission is processed:
                 </p>
-                <pre class="fwi-about-code">do_action( 'fwi_submission', $formName, $fields );</pre>
+                <pre class="fwi-about-code">do_action( 'fwi_submission', $formIdentifier, $fields );</pre>
                 <table class="fwi-about-table">
                     <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
                     <tbody>
-                        <tr><td><code>$formName</code></td><td><code>string</code></td><td>The logical name of the form — used for exclusion checks and per-form overrides.</td></tr>
+                        <tr><td><code>$formIdentifier</code></td><td><code>array{form_name: string, form_id: string}</code></td><td>Associative array identifying the form. <code>form_name</code> is used for exclusion checks and per-form overrides. <code>form_id</code> is the native form identifier (used in the payload when no <code>form_id</code> override is configured in settings).</td></tr>
                         <tr><td><code>$fields</code></td><td><code>array&lt;string, mixed&gt;</code></td><td>Associative array of field names / IDs to raw values. These become the <code>submission_data</code> keys in the payload.</td></tr>
                     </tbody>
                 </table>
 
                 <p style="margin-top:16px;">Two optional parameters allow runtime overrides for a single call:</p>
-                <pre class="fwi-about-code">do_action( 'fwi_submission', $formName, $fields, $urlQuery, $requestHeaders );</pre>
+                <pre class="fwi-about-code">do_action( 'fwi_submission', $formIdentifier, $fields, $urlQuery, $requestHeaders );</pre>
                 <table class="fwi-about-table">
                     <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
                     <tbody>
@@ -128,7 +128,7 @@ final class AboutPage
                 <pre class="fwi-about-code">// After your form validates and you have the field values:
 do_action(
     'fwi_submission',
-    'My Custom Contact Form',            // form name
+    [ 'form_name' => 'My Custom Contact Form', 'form_id' => $formId ],
     [                                    // field data
         'first_name' => $firstName,
         'email'      => $email,
@@ -139,7 +139,7 @@ do_action(
                 <h3 class="fwi-about-subheading">Example — With Runtime Overrides</h3>
                 <pre class="fwi-about-code">do_action(
     'fwi_submission',
-    'Newsletter Signup',
+    [ 'form_name' => 'Newsletter Signup', 'form_id' => $formId ],
     [ 'email' => $email ],
     [ 'source' => 'footer-widget' ],     // extra query param for this call only
     [ 'X-Campaign' => 'spring-2025' ]    // extra header for this call only
@@ -153,7 +153,7 @@ do_action(
                     When the calling code needs to inspect the outcome, use <code>fwi_submit_form()</code> instead of <code>do_action</code>.
                     It submits the form to the webhook and returns a <code>WebhookResponse</code> object with readonly <code>ok</code> and <code>msg</code> properties:
                 </p>
-                <pre class="fwi-about-code">$result = fwi_submit_form( $formName, $fields );
+                <pre class="fwi-about-code">$result = fwi_submit_form( [ 'form_name' => $formName, 'form_id' => $formId ], $fields );
 
 if ( ! $result->ok ) {
     // $result->msg contains a user-facing error description
@@ -162,7 +162,7 @@ if ( ! $result->ok ) {
                 <table class="fwi-about-table">
                     <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
                     <tbody>
-                        <tr><td><code>$formName</code></td><td><code>string</code></td><td>The logical name of the form.</td></tr>
+                        <tr><td><code>$formIdentifier</code></td><td><code>array{form_name: string, form_id: string}</code></td><td>Associative array with <code>form_name</code> and <code>form_id</code> keys identifying the form.</td></tr>
                         <tr><td><code>$fields</code></td><td><code>array&lt;string, mixed&gt;</code></td><td>Associative array of field names / IDs to raw values.</td></tr>
                         <tr><td><code>$urlQuery</code></td><td><code>array&lt;string, mixed&gt;</code></td><td>Optional extra query parameters for this call only.</td></tr>
                         <tr><td><code>$requestHeaders</code></td><td><code>array&lt;string, string&gt;</code></td><td>Optional extra headers for this call only.</td></tr>

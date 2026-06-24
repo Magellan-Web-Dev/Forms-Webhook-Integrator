@@ -18,9 +18,10 @@ use FormsWebhookIntegrator\Settings\SettingsManager;
  * All requests (successful and failed) are written to the log via WebhookLogger.
  *
  * External code can trigger a submission via:
- *   do_action('fwi_submission', $formName, $formFields);
- * where $formName is a string and $formFields is an associative array of
- * field names to field values.
+ *   do_action('fwi_submission', $formIdentifier, $formFields);
+ * where $formIdentifier is an associative array with 'form_name' (string) and
+ * 'form_id' (string) keys, and $formFields is an associative array of field
+ * names to field values.
  */
 final class WebhookHandler
 {
@@ -60,7 +61,7 @@ final class WebhookHandler
     /**
      * Processes a form submission and POSTs it to the webhook.
      *
-     * Can be called directly or via do_action('fwi_submission', $form_name, $fields).
+     * Can be called directly or via do_action('fwi_submission', $formIdentifier, $fields).
      * When called directly the return value indicates whether the webhook was sent
      * successfully, allowing callers (e.g. ElementorFormsBridge) to surface errors
      * back to the user. When invoked through do_action WordPress discards the return
@@ -77,7 +78,13 @@ final class WebhookHandler
      *  6. JSON-encode the payload and POST it to the webhook.
      *  7. Log the outcome (success or failure) via WebhookLogger.
      *
-     * @param string               $formName        The name of the submitted form.
+     * @param array{form_name: string, form_id: string} $formIdentifier
+     *                                              Associative array identifying the form.
+     *                                              'form_name' is used for exclusion checks and
+     *                                              per-form override lookups. 'form_id' is the
+     *                                              native form identifier supplied by the caller;
+     *                                              it is used in the payload only when no form_id
+     *                                              override is configured in settings.
      * @param array<string, mixed> $fields          Associative array of field names to values.
      * @param array<string, mixed> $urlQuery        Optional extra query parameters to append to
      *                                              the webhook URL (merged after the base URL and
@@ -95,8 +102,11 @@ final class WebhookHandler
      *                          raw) response body when an HTTP response was received;
      *                          null otherwise.
      */
-    public function handleFormSubmission(string $formName, array $fields, array $urlQuery = [], array $requestHeaders = []): WebhookResponse
+    public function handleFormSubmission(array $formIdentifier, array $fields, array $urlQuery = [], array $requestHeaders = []): WebhookResponse
     {
+        $formName     = (string) ($formIdentifier['form_name'] ?? '');
+        $passedFormId = (string) ($formIdentifier['form_id'] ?? '');
+
         if (!$this->settings->isActive()) {
             return new WebhookResponse(ok: false, msg: 'The webhook integration is not active.');
         }
@@ -131,9 +141,10 @@ final class WebhookHandler
             'page'       => $this->buildPageInfo(),
         ];
 
-        // Add form name and optional per-form identifier
+        // Add form name and identifier — settings override wins; caller-supplied form_id is the fallback
         $formData['form_name'] = $formName;
-        $formData['form_id']   = $this->settings->getFormOverride($formName)['form_id'];
+        $settingsFormId        = $this->settings->getFormOverride($formName)['form_id'];
+        $formData['form_id']   = $settingsFormId !== '' ? $settingsFormId : $passedFormId;
 
         // Sanitize and store submission fields, preserving array structure for
         // multi-value fields such as checkbox groups.
