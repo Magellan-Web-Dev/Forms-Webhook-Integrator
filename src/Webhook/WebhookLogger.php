@@ -255,7 +255,7 @@ final class WebhookLogger
             return $requestData;
         }
 
-        foreach ($requestData['submission_data'] as $key => $value) {
+        foreach (array_keys($requestData['submission_data']) as $key) {
             $lower = strtolower((string) $key);
             foreach (self::SENSITIVE_FIELD_PATTERNS as $pattern) {
                 if (str_contains($lower, $pattern)) {
@@ -281,7 +281,7 @@ final class WebhookLogger
 
         parse_str($parts['query'], $params);
         $redacted = false;
-        foreach ($params as $key => $value) {
+        foreach (array_keys($params) as $key) {
             $lower = strtolower((string) $key);
             foreach (self::SENSITIVE_FIELD_PATTERNS as $pattern) {
                 if (str_contains($lower, $pattern)) {
