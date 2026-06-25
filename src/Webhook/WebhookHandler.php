@@ -175,7 +175,12 @@ final class WebhookHandler
 
             $ipErrorMessage  = 'Unable to get client location information from the user IP address.';
             $ipUrl           = 'https://ipapi.co/' . $ip . '/json';
-            $ipLookupRequest = wp_remote_get($ipUrl);
+
+            // The geolocation lookup blocks the form submission, so keep its
+            // timeout short and filterable. A slow ipapi.co response should not
+            // be able to stall the submission for the full default timeout.
+            $ipTimeout       = (int) apply_filters('fwi_ip_lookup_timeout', 3);
+            $ipLookupRequest = wp_remote_get($ipUrl, ['timeout' => $ipTimeout]);
 
             if (!is_wp_error($ipLookupRequest)) {
                 $ipData    = wp_remote_retrieve_body($ipLookupRequest);
@@ -245,6 +250,11 @@ final class WebhookHandler
         $overallOk    = true;
         $lastResponse = new WebhookResponse(ok: false, msg: 'No webhook URLs with a configured URL were found.');
 
+        // Each endpoint POST is synchronous and blocks the submission response,
+        // so the per-request timeout is filterable for site owners running slow
+        // or many endpoints who need to tune the front-end wait.
+        $webhookTimeout = (int) apply_filters('fwi_webhook_timeout', 10);
+
         foreach ($webhooks as $idx => $webhook) {
             $webhookUrl = $this->settings->buildWebhookUrlForWebhook($webhook);
             if (empty($webhookUrl)) {
@@ -263,7 +273,7 @@ final class WebhookHandler
             $response = wp_safe_remote_post($webhookUrl, [
                 'body'    => $jsonData,
                 'headers' => $headers,
-                'timeout' => 10,
+                'timeout' => $webhookTimeout,
             ]);
 
             if (is_wp_error($response)) {

@@ -9,7 +9,7 @@ A WordPress plugin that forwards Elementor Pro form submissions — and any othe
 | Requirement | Minimum |
 |---|---|
 | PHP | 8.1 |
-| WordPress | 6.0+ (recommended) |
+| WordPress | 6.3 |
 | Elementor Pro | Any version that provides `elementor_pro/forms/new_record` |
 
 Elementor Pro is required only for the built-in Elementor bridge. Other form plugins can integrate via the [public action hook](#public-action-hook).

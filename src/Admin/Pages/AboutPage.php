@@ -20,7 +20,7 @@ final class AboutPage
                 </p>
                 <ul class="fwi-about-requirements">
                     <li><span class="fwi-about-label">PHP</span> 8.1+</li>
-                    <li><span class="fwi-about-label">WordPress</span> 6.0+</li>
+                    <li><span class="fwi-about-label">WordPress</span> 6.3+</li>
                     <li><span class="fwi-about-label">Elementor Pro</span> Optional — required only for the built-in Elementor bridge; all other forms use the public action hook.</li>
                 </ul>
             </div>

@@ -264,12 +264,17 @@ final class AdminMenu
             ver:    FWI_VERSION
         );
 
+        // Positional arguments are used deliberately for the final parameter:
+        // it was renamed from $in_footer to $args in WordPress 6.3, so a named
+        // argument (args: / in_footer:) would fatal on either side of that
+        // boundary. Passing `true` positionally loads the script in the footer
+        // and is compatible with every supported WordPress version.
         wp_enqueue_script(
-            handle: 'FWI-admin',
-            src:    FWI_PLUGIN_URL . 'assets/js/admin.js',
-            deps:   [],
-            ver:    FWI_VERSION,
-            args:   true
+            'FWI-admin',
+            FWI_PLUGIN_URL . 'assets/js/admin.js',
+            [],
+            FWI_VERSION,
+            true
         );
 
         wp_localize_script('FWI-admin', 'FWI', [

@@ -95,12 +95,23 @@ final class AnalyticsApiHandler
      * Registered with add_filter(..., 10, 1) so only the response object is
      * received — no unused $server or $request parameters needed.
      *
-     * @param \WP_REST_Response $response
+     * The parameter is intentionally untyped: rest_post_dispatch can hand this
+     * filter a WP_Error (via rest_ensure_response) for any REST request that
+     * errors out. We only act on WP_REST_Response objects and pass everything
+     * else through untouched, so the filter can never fatal on a non-response.
      *
-     * @return \WP_REST_Response
+     * @param mixed $response Usually a WP_REST_Response, but may be a WP_Error
+     *                        or other value for non-route or errored requests.
+     *
+     * @return mixed The response unmodified, or with CORS headers added when it
+     *               is a WP_REST_Response for the analytics route.
      */
-    public function addCorsHeaders(\WP_REST_Response $response): \WP_REST_Response
+    public function addCorsHeaders($response)
     {
+        if (!$response instanceof \WP_REST_Response) {
+            return $response;
+        }
+
         if (!str_contains((string) ($_SERVER['REQUEST_URI'] ?? ''), '/fwi/v1/analytics')) {
             return $response;
         }
