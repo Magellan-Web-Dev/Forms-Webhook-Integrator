@@ -70,8 +70,25 @@ final class SettingsManager
 
     /**
      * WordPress option key: result of the most recent webhook connectivity test.
+     * @deprecated Still written/read for backward compat; prefer OPTION_WEBHOOK_TEST_RESULTS.
      */
     public const OPTION_LAST_TEST_RESULT = 'FWI_last_test_result';
+
+    /**
+     * WordPress option key: ordered array of webhook endpoint objects.
+     *
+     * Each element is an associative array with 'url' (string) and 'label' (string) keys.
+     * When not yet set, the plugin falls back to the legacy OPTION_WEBHOOK_URL single-URL option.
+     */
+    public const OPTION_WEBHOOKS = 'FWI_webhooks';
+
+    /**
+     * WordPress option key: per-index connectivity test results.
+     *
+     * Stored as an array keyed by webhook index (0, 1, 2, …). Each value is an
+     * associative array with 'success', 'message', 'tested_url', and 'time' keys.
+     */
+    public const OPTION_WEBHOOK_TEST_RESULTS = 'FWI_webhook_test_results';
 
     /**
      * WordPress option key: per-form URL query parameter and header overrides.
@@ -113,13 +130,68 @@ final class SettingsManager
     }
 
     /**
+     * Returns all configured webhook endpoint objects.
+     *
+     * Each element is an associative array with 'url' (string) and 'label' (string) keys.
+     * Falls back to the legacy single-URL option when the new option is not yet saved,
+     * so existing installations continue to work without any settings re-save.
+     *
+     * @return array<int, array{url: string, label: string}>
+     */
+    public function getWebhooks(): array
+    {
+        $webhooks = get_option(self::OPTION_WEBHOOKS, null);
+
+        if (is_array($webhooks)) {
+            return array_values(array_filter($webhooks, fn($w) => is_array($w)));
+        }
+
+        // Legacy fallback: migrate single URL to a one-element array (in memory only).
+        $legacyUrl = (string) get_option(self::OPTION_WEBHOOK_URL, '');
+        if ($legacyUrl !== '') {
+            return [['url' => $legacyUrl, 'label' => '']];
+        }
+
+        return [];
+    }
+
+    /**
      * Returns the raw (un-parameterised) webhook endpoint URL.
+     *
+     * Returns the first webhook's URL for backward compatibility with code that
+     * still calls this method. Prefer getWebhooks() for new code.
      *
      * @return string The stored URL, or an empty string if not yet configured.
      */
     public function getWebhookUrl(): string
     {
-        return (string) get_option(self::OPTION_WEBHOOK_URL, '');
+        $webhooks = $this->getWebhooks();
+        return (string) ($webhooks[0]['url'] ?? '');
+    }
+
+    /**
+     * Builds and returns the fully-qualified URL for a specific webhook object,
+     * including the stored global query parameters as a query string.
+     *
+     * @param array{url: string, label: string} $webhook A single webhook element from getWebhooks().
+     *
+     * @return string The complete URL, or empty string if the webhook URL is blank.
+     */
+    public function buildWebhookUrlForWebhook(array $webhook): string
+    {
+        $url    = (string) ($webhook['url'] ?? '');
+        $params = $this->getQueryParams();
+
+        if (empty($url)) {
+            return '';
+        }
+
+        if (!empty($params)) {
+            $queryArray = array_column($params, 'value', 'key');
+            $url        = add_query_arg($queryArray, $url);
+        }
+
+        return $url;
     }
 
     /**
@@ -136,29 +208,19 @@ final class SettingsManager
     }
 
     /**
-     * Builds and returns the fully-qualified webhook URL, including any stored
-     * query parameters appended as a query string.
+     * Builds and returns the fully-qualified URL for the first webhook, including
+     * any stored query parameters. Kept for backward compatibility; prefer
+     * buildWebhookUrlForWebhook() with a specific webhook element.
      *
-     * Returns an empty string if no webhook URL has been configured, so callers
-     * should check for an empty return value before making a request.
-     *
-     * @return string The complete webhook URL with query string, or empty string.
+     * @return string The complete URL with query string, or empty string.
      */
     public function buildWebhookUrl(): string
     {
-        $url    = $this->getWebhookUrl();
-        $params = $this->getQueryParams();
-
-        if (empty($url)) {
+        $webhooks = $this->getWebhooks();
+        if (empty($webhooks)) {
             return '';
         }
-
-        if (!empty($params)) {
-            $queryArray = array_column($params, 'value', 'key');
-            $url        = add_query_arg($queryArray, $url);
-        }
-
-        return $url;
+        return $this->buildWebhookUrlForWebhook($webhooks[0]);
     }
 
     /**
@@ -293,16 +355,31 @@ final class SettingsManager
     }
 
     /**
-     * Returns the result of the most recent webhook connectivity test.
+     * Returns the connectivity test result for a specific webhook by index.
      *
      * Keys: success (bool), message (string), tested_url (string), time (string).
+     *
+     * @param int $webhookIndex 0-based index into the webhooks array.
+     *
+     * @return array<string, mixed>
+     */
+    public function getWebhookTestResult(int $webhookIndex): array
+    {
+        $all = get_option(self::OPTION_WEBHOOK_TEST_RESULTS, []);
+        $all = is_array($all) ? $all : [];
+        return is_array($all[$webhookIndex] ?? null) ? $all[$webhookIndex] : [];
+    }
+
+    /**
+     * Returns the result of the most recent connectivity test for the first webhook.
+     *
+     * Preserved for backward compatibility. Keys: success, message, tested_url, time.
      *
      * @return array<string, mixed>
      */
     public function getLastTestResult(): array
     {
-        $result = get_option(self::OPTION_LAST_TEST_RESULT, []);
-        return is_array($result) ? $result : [];
+        return $this->getWebhookTestResult(0);
     }
 
     /**
@@ -365,32 +442,57 @@ final class SettingsManager
     }
 
     /**
-     * Persists the outcome of a webhook connectivity test to the options table.
+     * Persists the outcome of a connectivity test for a specific webhook index.
      *
-     * @param bool   $success    True when the endpoint returned 200 or 201.
-     * @param string $message    Human-readable outcome description.
-     * @param string $testedUrl  The full URL (including query string) that was tested.
+     * @param int    $webhookIndex 0-based index into the webhooks array.
+     * @param bool   $success      True when the endpoint returned 200/201/202/204.
+     * @param string $message      Human-readable outcome description.
+     * @param string $testedUrl    The full URL (including query string) that was tested.
+     *
+     * @return void
+     */
+    public function saveWebhookTestResult(int $webhookIndex, bool $success, string $message, string $testedUrl): void
+    {
+        $all = get_option(self::OPTION_WEBHOOK_TEST_RESULTS, []);
+        $all = is_array($all) ? $all : [];
+
+        $all[$webhookIndex] = [
+            'success'    => $success,
+            'message'    => $message,
+            'tested_url' => $testedUrl,
+            'time'       => current_time('mysql'),
+        ];
+
+        update_option(self::OPTION_WEBHOOK_TEST_RESULTS, $all);
+    }
+
+    /**
+     * Persists the outcome of a connectivity test for the first webhook.
+     *
+     * Preserved for backward compatibility.
+     *
+     * @param bool   $success
+     * @param string $message
+     * @param string $testedUrl
      *
      * @return void
      */
     public function saveLastTestResult(bool $success, string $message, string $testedUrl): void
     {
-        update_option(self::OPTION_LAST_TEST_RESULT, [
-            'success'    => $success,
-            'message'    => $message,
-            'tested_url' => $testedUrl,
-            'time'       => current_time('mysql'),
-        ]);
+        $this->saveWebhookTestResult(0, $success, $message, $testedUrl);
     }
 
     /**
-     * Removes any stored last-test result, used when the webhook URL changes.
+     * Removes any stored test result for the first webhook, used when its URL changes.
      *
      * @return void
      */
     public function clearLastTestResult(): void
     {
-        delete_option(self::OPTION_LAST_TEST_RESULT);
+        $all = get_option(self::OPTION_WEBHOOK_TEST_RESULTS, []);
+        $all = is_array($all) ? $all : [];
+        unset($all[0]);
+        update_option(self::OPTION_WEBHOOK_TEST_RESULTS, $all);
     }
 
     /**
@@ -405,14 +507,58 @@ final class SettingsManager
      */
     public function save(array $data): void
     {
-        $webhookUrl = esc_url_raw((string) ($data['fwi_webhook_url'] ?? ''));
-        if (!empty($webhookUrl) && !wp_http_validate_url($webhookUrl)) {
-            $webhookUrl = '';
-        }
-        update_option(self::OPTION_WEBHOOK_URL, $webhookUrl);
+        // ── Multi-webhook endpoints ───────────────────────────────────────────
+        $oldWebhooks = $this->getWebhooks();
 
-        // Cannot be active without a URL — prevent silent data loss.
-        update_option(self::OPTION_ACTIVE, !empty($data['fwi_active']) && !empty($webhookUrl));
+        $newWebhooks = [];
+        if (!empty($data['fwi_webhooks']) && is_array($data['fwi_webhooks'])) {
+            foreach (array_values($data['fwi_webhooks']) as $entry) {
+                if (!is_array($entry)) {
+                    continue;
+                }
+                $url = esc_url_raw((string) ($entry['url'] ?? ''));
+                if (!empty($url) && !wp_http_validate_url($url)) {
+                    $url = '';
+                }
+                $newWebhooks[] = [
+                    'url'   => $url,
+                    'label' => sanitize_text_field((string) ($entry['label'] ?? '')),
+                ];
+            }
+        }
+
+        // Ensure at least one element (may be empty-URL placeholder).
+        if (empty($newWebhooks)) {
+            $newWebhooks = [['url' => '', 'label' => '']];
+        }
+
+        update_option(self::OPTION_WEBHOOKS, $newWebhooks);
+
+        // Keep legacy single-URL option in sync with the first webhook for
+        // any external code that still reads FWI_webhook_url directly.
+        $firstUrl = (string) ($newWebhooks[0]['url'] ?? '');
+        update_option(self::OPTION_WEBHOOK_URL, $firstUrl);
+
+        // Clear test results for webhooks whose URL changed or that no longer exist.
+        $testResults = get_option(self::OPTION_WEBHOOK_TEST_RESULTS, []);
+        $testResults = is_array($testResults) ? $testResults : [];
+
+        foreach ($newWebhooks as $idx => $webhook) {
+            $oldUrl = (string) ($oldWebhooks[$idx]['url'] ?? '');
+            if ($webhook['url'] !== $oldUrl && isset($testResults[$idx])) {
+                unset($testResults[$idx]);
+            }
+        }
+        foreach (array_keys($testResults) as $idx) {
+            if (!isset($newWebhooks[$idx])) {
+                unset($testResults[$idx]);
+            }
+        }
+        update_option(self::OPTION_WEBHOOK_TEST_RESULTS, $testResults);
+
+        // Cannot be active without at least one URL — prevent silent data loss.
+        $hasAnyUrl = !empty(array_filter(array_column($newWebhooks, 'url')));
+        update_option(self::OPTION_ACTIVE, !empty($data['fwi_active']) && $hasAnyUrl);
 
         update_option(
             self::OPTION_CLIENT_FIRST_NAME,

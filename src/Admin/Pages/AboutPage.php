@@ -15,8 +15,8 @@ final class AboutPage
 
             <div class="fwi-about-intro fwi-card">
                 <p>
-                    <strong>Forms Webhook Integrator</strong> forwards form submissions — from Elementor Pro or any WordPress code — to a configurable webhook endpoint as a structured JSON payload.
-                    It includes an admin settings UI, per-request analytics logging, a read-only REST API, and automatic updates from GitHub releases.
+                    <strong>Forms Webhook Integrator</strong> forwards form submissions — from Elementor Pro or any WordPress code — to one or more configurable webhook endpoints as a structured JSON payload.
+                    It includes an admin settings UI, per-request analytics logging with per-endpoint filtering, a read-only REST API, and automatic updates from GitHub releases.
                 </p>
                 <ul class="fwi-about-requirements">
                     <li><span class="fwi-about-label">PHP</span> 8.1+</li>
@@ -32,10 +32,11 @@ final class AboutPage
                 <table class="fwi-about-table">
                     <thead><tr><th>Setting</th><th>Description</th></tr></thead>
                     <tbody>
-                        <tr><td>Webhook Status</td><td>Global enable / disable toggle. Hidden until a URL is saved. Setting to <em>Inactive</em> stops all POSTs without removing configuration.</td></tr>
-                        <tr><td>Webhook URL</td><td>The full URL the plugin POSTs JSON to on every submission.</td></tr>
-                        <tr><td>Test Webhook</td><td>Sends a lightweight test payload (<code>{"msg":"Webhook submission test"}</code>) to the currently-typed URL and shows the HTTP response code inline.</td></tr>
-                        <tr><td>Global Headers</td><td>Key/value HTTP headers included on every request, merged after <code>Content-Type: application/json</code>.</td></tr>
+                        <tr><td>Webhook Status</td><td>Global enable / disable toggle. Hidden until at least one webhook URL is saved. Setting to <em>Inactive</em> stops all POSTs without removing configuration.</td></tr>
+                        <tr><td>Webhook Endpoints</td><td>One or more webhook URLs the plugin POSTs JSON to on every form submission. Each block has its own URL field, optional label, and <em>Test Webhook</em> button. Use <strong>+ Add Additional URL</strong> to add a second or subsequent endpoint; each additional block has a <strong>Remove</strong> button. When multiple endpoints are configured, the submission is sent to <em>all</em> of them in sequence.</td></tr>
+                        <tr><td>Webhook Label</td><td>An optional human-readable name for each endpoint (e.g. <em>CRM</em>, <em>Slack</em>). Labels appear as coloured badges on Analytics log entries and power the per-webhook filter dropdown on the Analytics page.</td></tr>
+                        <tr><td>Test Webhook</td><td>Each webhook block has its own <em>Test Webhook</em> button. It sends a lightweight test payload (<code>{"msg":"Webhook submission test"}</code>) to the URL currently typed in that block and shows the HTTP response code inline. The result is persisted and shown on subsequent page loads for that specific endpoint.</td></tr>
+                        <tr><td>Global Headers</td><td>Key/value HTTP headers included on every request to every endpoint, merged after <code>Content-Type: application/json</code>.</td></tr>
                         <tr><td>Global URL Query Parameters</td><td>Key/value pairs appended as a query string to the webhook URL on every request.</td></tr>
                         <tr><td>Include Page URL Parameters</td><td>When enabled, any query parameters in the URL of the page where the form was submitted (e.g. <code>?utm_source=google</code>) are automatically appended to the webhook URL for every form submission. Can also be toggled per-form in the <em>Specific Form</em> section. Page params are merged after global params but before per-form params, so per-form values take the highest precedence.</td></tr>
                         <tr><td>Client First / Last Name</td><td>Embedded in the <code>website_info.client</code> block of every payload.</td></tr>
@@ -192,9 +193,10 @@ if ( ! $result->ok ) {
                 <ul class="fwi-about-list">
                     <li>Accordion sections for <em>Total Requests</em> and <em>Total Errors</em>, each sorted newest-first.</li>
                     <li>Each entry shows the timestamp, form name, HTTP response code, full webhook URL, request payload, and raw response body.</li>
-                    <li>Filter by year / month and paginate (5 / 10 / 25 / 50 / 100 per page).</li>
-                    <li><strong>Delete</strong> a single entry via AJAX, <strong>Clear All Logs</strong> after confirmation, or export as <strong>CSV</strong> / <strong>JSON</strong>.</li>
-                    <li>A daily WP-Cron event automatically purges entries older than <strong>3 months</strong>.</li>
+                    <li>When multiple webhook endpoints are configured, each endpoint generates its <strong>own separate log entry</strong> per form submission. Entries for labelled endpoints display a coloured badge showing the webhook label.</li>
+                    <li>Filter by <strong>year / month</strong>, by <strong>webhook endpoint</strong> (when more than one labelled endpoint exists), or by free-text search. Paginate at 5 / 10 / 25 / 50 / 100 entries per page.</li>
+                    <li><strong>Delete</strong> a single entry via AJAX, <strong>Clear All Logs</strong> after confirmation, or export as <strong>CSV</strong> / <strong>JSON</strong> (both include the webhook label column).</li>
+                    <li>A daily WP-Cron event automatically purges entries older than the configured <strong>Log Retention</strong> period (default 3 months).</li>
                 </ul>
             </div>
 

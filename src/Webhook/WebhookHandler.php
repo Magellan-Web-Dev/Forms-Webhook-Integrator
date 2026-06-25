@@ -116,30 +116,26 @@ final class WebhookHandler
             return new WebhookResponse(ok: false, msg: 'This form is excluded from webhook submissions by the current settings.');
         }
 
-        // Build webhook URL (base URL + query params from settings, then caller-supplied params)
-        $webhookUrl = $this->settings->buildWebhookUrl();
-        if (empty($webhookUrl)) {
+        $webhooks = $this->settings->getWebhooks();
+        if (empty($webhooks)) {
             return new WebhookResponse(ok: false, msg: 'No webhook URL is configured.');
         }
 
-        if (!empty($urlQuery)) {
-            $webhookUrl = add_query_arg($urlQuery, $webhookUrl);
-        }
+        // ── Build payload once (shared across all webhook endpoints) ──────────
 
-        // Initialize form data array
         $formData = [];
 
         // Add website data
         $formData['website_info'] = [
-            'name'       => get_bloginfo('name'),
-            'url'        => home_url(),
-            'id'         => $this->settings->getWebsiteId(),
-            'client'     => [
+            'name'   => get_bloginfo('name'),
+            'url'    => home_url(),
+            'id'     => $this->settings->getWebsiteId(),
+            'client' => [
                 'first_name' => $this->settings->getClientFirstName(),
                 'last_name'  => $this->settings->getClientLastName(),
                 'id'         => $this->settings->getClientId(),
             ],
-            'page'       => $this->buildPageInfo(),
+            'page' => $this->buildPageInfo(),
         ];
 
         // Add form name and identifier — settings override wins; caller-supplied form_id is the fallback
@@ -177,9 +173,8 @@ final class WebhookHandler
             // Handle multiple IP addresses (proxies) — take the first one
             $ip = trim(explode(',', $ip)[0]);
 
-            $ipErrorMessage = 'Unable to get client location information from the user IP address.';
-            $ipUrl          = 'https://ipapi.co/' . $ip . '/json';
-
+            $ipErrorMessage  = 'Unable to get client location information from the user IP address.';
+            $ipUrl           = 'https://ipapi.co/' . $ip . '/json';
             $ipLookupRequest = wp_remote_get($ipUrl);
 
             if (!is_wp_error($ipLookupRequest)) {
@@ -225,13 +220,12 @@ final class WebhookHandler
         // Convert form data to JSON
         $jsonData = json_encode($formData);
 
-        // Check for JSON encoding errors
         if ($jsonData === false) {
             error_log('FWI JSON encoding error: ' . json_last_error_msg());
             return new WebhookResponse(ok: false, msg: 'There was an issue compiling the submission data to send to the webhook.');
         }
 
-        // Build headers — Content-Type first, then settings headers, then caller-supplied headers
+        // Build shared headers — Content-Type first, then settings headers, then caller-supplied headers
         $headers = ['Content-Type' => 'application/json'];
 
         foreach ($this->settings->getWebhookHeaders() as $customHeader) {
@@ -246,67 +240,80 @@ final class WebhookHandler
             }
         }
 
-        // Setup POST request arguments
-        $args = [
-            'body'    => $jsonData,
-            'headers' => $headers,
-            'timeout' => 10,
-        ];
+        // ── Dispatch to each configured webhook endpoint ───────────────────────
 
-        // Make HTTP POST request to the webhook
-        $response = wp_safe_remote_post($webhookUrl, $args);
+        $overallOk    = true;
+        $lastResponse = new WebhookResponse(ok: false, msg: 'No webhook URLs with a configured URL were found.');
 
-        if (is_wp_error($response)) {
-            $errorMessage = $response->get_error_message();
-            error_log('FWI Webhook error: ' . $errorMessage);
+        foreach ($webhooks as $idx => $webhook) {
+            $webhookUrl = $this->settings->buildWebhookUrlForWebhook($webhook);
+            if (empty($webhookUrl)) {
+                continue;
+            }
 
-            $this->logger->log(
-                requestData: $formData,
-                requestUrl: $webhookUrl,
-                responseCode: 0,
-                responseData: (string) wp_json_encode(['error' => $errorMessage])
-            );
+            if (!empty($urlQuery)) {
+                $webhookUrl = add_query_arg($urlQuery, $webhookUrl);
+            }
 
-            return new WebhookResponse(ok: false, msg: 'There was an issue submitting the form data through the webhook.');
-        }
+            $label = trim((string) ($webhook['label'] ?? ''));
+            if ($label === '') {
+                $label = 'Webhook ' . ($idx + 1);
+            }
 
-        // Check for successful response
-        $responseBody = wp_remote_retrieve_body($response);
+            $response = wp_safe_remote_post($webhookUrl, [
+                'body'    => $jsonData,
+                'headers' => $headers,
+                'timeout' => 10,
+            ]);
 
-        // Log the response body for non-successful responses to aid debugging, but not for successful ones to avoid log clutter. The full response is still logged in all cases.
-        $responseCode = (int) wp_remote_retrieve_response_code($response);
+            if (is_wp_error($response)) {
+                $errorMessage = $response->get_error_message();
+                error_log('FWI Webhook error (' . $label . '): ' . $errorMessage);
 
-        // Decode the response body once; fall back to raw string if not valid JSON.
-        $decodedBody = !empty($responseBody) ? (json_decode($responseBody, true) ?? $responseBody) : null;
+                $this->logger->log(
+                    requestData: $formData,
+                    requestUrl: $webhookUrl,
+                    responseCode: 0,
+                    responseData: (string) wp_json_encode(['error' => $errorMessage]),
+                    webhookLabel: $label
+                );
 
-        // 200, 201, 202, and 204 are all treated as success; anything else is a failure.
-        // Transport-level errors are also failures (responseCode = 0).
-        $okResponse = $responseCode === 200 || $responseCode === 201 || $responseCode === 202 || $responseCode === 204;
+                $overallOk    = false;
+                $lastResponse = new WebhookResponse(ok: false, msg: 'There was an issue submitting the form data through the webhook.');
+                continue;
+            }
 
-        // Log non-successful responses for debugging
-        if (!$okResponse) {
-            error_log('FWI Webhook response: ' . $responseBody);
+            $responseBody = wp_remote_retrieve_body($response);
+            $responseCode = (int) wp_remote_retrieve_response_code($response);
+            $decodedBody  = !empty($responseBody) ? (json_decode($responseBody, true) ?? $responseBody) : null;
+            $okResponse   = in_array($responseCode, [200, 201, 202, 204], true);
+
+            if (!$okResponse) {
+                error_log('FWI Webhook response (' . $label . '): ' . $responseBody);
+                $overallOk = false;
+            }
 
             $this->logger->log(
                 requestData: $formData,
                 requestUrl: $webhookUrl,
                 responseCode: $responseCode,
-                responseData: $responseBody
+                responseData: $responseBody,
+                webhookLabel: $label
             );
 
-            return new WebhookResponse(ok: false, status: $responseCode, msg: 'There was an issue submitting the form data through the webhook.', data: $decodedBody);
+            $lastResponse = new WebhookResponse(
+                ok: $okResponse,
+                status: $responseCode,
+                msg: $okResponse ? 'Successfully submitted form data through the webhook.' : 'There was an issue submitting the form data through the webhook.',
+                data: $decodedBody
+            );
         }
 
-        // Log successful request
-        $this->logger->log(
-            requestData: $formData,
-            requestUrl: $webhookUrl,
-            responseCode: $responseCode,
-            responseData: $responseBody
-        );
+        if ($overallOk) {
+            return new WebhookResponse(ok: true, status: $lastResponse->status, msg: 'Successfully submitted form data through all webhooks.', data: $lastResponse->data);
+        }
 
-        // Return success
-        return new WebhookResponse(ok: true, status: $responseCode, msg: 'Successfully submitted form data through the webhook.', data: $decodedBody);
+        return $lastResponse;
     }
 
     /**

@@ -1,6 +1,6 @@
 # Forms Webhook Integrator
 
-A WordPress plugin that forwards Elementor Pro form submissions — and any other form — to a configurable webhook endpoint as a structured JSON payload. Includes an admin settings UI, per-request analytics logging, and automatic updates from GitHub releases.
+A WordPress plugin that forwards Elementor Pro form submissions — and any other form — to one or more configurable webhook endpoints as a structured JSON payload. Includes an admin settings UI, per-endpoint analytics logging with label-based filtering, a read-only REST API, and automatic updates from GitHub releases.
 
 ---
 
@@ -23,7 +23,7 @@ Elementor Pro is required only for the built-in Elementor bridge. Other form plu
 3. Activate **Forms Webhook Integrator**.
 4. Go to **Webhook Integrator → Settings** to configure the endpoint.
 
-Once a webhook URL is saved, the **Webhook Status** toggle appears. The webhook will not fire until the toggle is set to **Active**.
+Once at least one webhook URL is saved, the **Webhook Status** toggle appears. The webhook will not fire until the toggle is set to **Active**.
 
 ---
 
@@ -37,17 +37,30 @@ A toggle that enables or disables the webhook globally. The toggle is hidden unt
 
 ### Webhook Settings
 
+#### Webhook Endpoints
+
+The settings page starts with a single webhook block. Use **+ Add Additional URL** to add more endpoints; the second and subsequent blocks each have a **Remove** button. When more than one endpoint is configured, every form submission is sent to **all** of them in sequence, with each endpoint producing its own separate log entry in Analytics.
+
+Each webhook block contains:
+
 | Field | Description |
 |---|---|
-| **Webhook URL** | The full URL the plugin POSTs JSON to on every form submission. |
-| **Test Webhook** | Sends a lightweight test payload (`{"msg": "Webhook submission test"}`) to the currently-typed URL without saving, and displays the HTTP response code inline. The result is also persisted and shown on every subsequent page load. |
-| **Global Headers** | Custom HTTP headers included on every webhook request (e.g. `Authorization: Bearer …`). Added via a key/value builder; any header here is merged after `Content-Type: application/json`. |
-| **Global URL Query Parameters** | Key/value pairs appended as a query string to the webhook URL on every request. Also includes an **Include Page URL Parameters** checkbox — when enabled, any query parameters present in the URL of the page where the form was submitted (e.g. `?utm_source=google&gclid=…`) are automatically appended to the webhook URL on every form submission. |
+| **Webhook URL** | The full URL the plugin POSTs JSON to for this endpoint on every form submission. |
+| **Label** | An optional human-readable name for this endpoint (e.g. `CRM`, `Slack`). Labels appear as coloured badges on Analytics log entries and are available as a filter on the Analytics page. |
+| **Test Webhook** | Sends a lightweight test payload (`{"msg": "Webhook submission test"}`) to the URL currently typed in this block's URL field. Displays the HTTP response code inline without saving, and persists the result so it is visible on the next page load for that specific endpoint. |
+
+#### Other Settings
+
+| Field | Description |
+|---|---|
+| **Global Headers** | Custom HTTP headers included on every webhook request to every endpoint (e.g. `Authorization: Bearer …`). Added via a key/value builder; any header here is merged after `Content-Type: application/json`. |
+| **Global URL Query Parameters** | Key/value pairs appended as a query string to every webhook URL on every request. Also includes an **Include Page URL Parameters** checkbox — when enabled, any query parameters present in the URL of the page where the form was submitted (e.g. `?utm_source=google&gclid=…`) are automatically appended to the webhook URL on every form submission. |
 | **Client First Name** | Embedded in the `website_info.client` block of every payload. |
 | **Client Last Name** | Embedded in the `website_info.client` block of every payload. |
 | **Client ID** | Optional identifier sent as `website_info.client.id` in every payload. Leave blank if not needed. |
 | **Website ID** | Optional identifier sent as `website_info.id` in every payload. Leave blank if not needed. |
 | **Block Submissions Outside US** | When set to **Yes**, any submission where the sender's IP resolves to a country other than the United States is rejected before the webhook fires. Defaults to **Yes**. |
+| **Log Retention** | How long log entries are kept before the daily purge removes them. Options: 1, 3, 6, 12, or 24 months. Defaults to 3 months. |
 
 ### Excluded Forms
 
@@ -201,15 +214,20 @@ If the webhook integration is disabled in settings, `fwi_submit_form()` returns 
 Each accordion shows its entries newest-first. Per-entry data includes:
 
 - Timestamp, form name, HTTP response code, and success/failure status
+- The webhook label badge (when the endpoint has a label configured)
 - The full webhook URL (including query string) that was used
 - The JSON request payload that was sent
 - The raw response body received
+
+When multiple webhook endpoints are configured, each endpoint generates its **own separate log entry** per form submission, making it easy to see which endpoint succeeded or failed independently.
 
 ### Filtering and Pagination
 
 Each accordion has independent controls:
 
 - **Year / Month** dropdowns to filter by calendar period
+- **Webhook** dropdown to filter by a specific endpoint label (visible only when more than one distinct labelled endpoint exists in the log)
+- **Search** field to filter by any text in the request data
 - **Per page** selector: 5, 10, 25, 50, or 100 entries per page
 - Page navigation with a windowed page-number selector
 
@@ -217,12 +235,12 @@ Each accordion has independent controls:
 
 - **Delete** — removes a single log entry immediately via AJAX (no page reload)
 - **Clear All Logs** — truncates the entire log table after a confirmation prompt
-- **Export CSV** — downloads all logs as a UTF-8 CSV file (Excel-compatible)
-- **Export JSON** — downloads all logs as a pretty-printed JSON file
+- **Export CSV** — downloads all logs as a UTF-8 CSV file (Excel-compatible); includes a **Webhook** column for the endpoint label
+- **Export JSON** — downloads all logs as a pretty-printed JSON file; includes a `webhook_label` field per entry
 
 ### Retention
 
-A daily WP-Cron event automatically purges log rows older than **3 months**, keeping the table size manageable without manual intervention.
+A daily WP-Cron event automatically purges log rows older than the **Log Retention** period configured in settings (default 3 months), keeping the table size manageable without manual intervention.
 
 ---
 
@@ -375,11 +393,23 @@ The plugin creates a single custom table — `{prefix}FWI_webhook_logs` — on a
 | `request_data` | `LONGTEXT` | JSON-encoded request payload |
 | `response_data` | `LONGTEXT` | Raw response body, or error JSON on transport failure |
 | `response_code` | `INT` | HTTP status code (`0` for transport errors) |
+| `webhook_label` | `VARCHAR(255)` | Optional label of the webhook endpoint that produced this row (empty string when unlabelled) |
 | `created_at` | `DATETIME` | UTC timestamp of the request |
 
 ---
 
 ## Changelog
+
+### 2.0.0
+- **Multi-webhook support** — configure any number of webhook endpoints under a single settings page. Each additional URL is added via the **+ Add Additional URL** button; additional blocks can be removed individually.
+- **Webhook labels** — each endpoint can have an optional label (e.g. `CRM`, `Slack`) that appears as a badge on Analytics log entries.
+- **Per-endpoint logging** — every configured endpoint generates its own separate log entry per form submission, making success/failure visible independently for each destination.
+- **Per-endpoint test button** — each webhook block has its own **Test Webhook** button; test results are stored and displayed per endpoint.
+- **Analytics webhook filter** — a new dropdown on the Analytics page filters log entries by webhook endpoint label when more than one labelled endpoint exists.
+- **Log Retention setting** — choose how long log entries are kept (1, 3, 6, 12, or 24 months); previously hardcoded to 3 months.
+- **Database schema update** — added `webhook_label` column to `{prefix}FWI_webhook_logs`; existing rows default to an empty string. Schema version bumped to `6.0`; `dbDelta` upgrades existing installs non-destructively.
+- **Backward compatible** — the legacy `FWI_webhook_url` option is read as a fallback when `FWI_webhooks` is not yet set, so existing installs upgrade seamlessly without losing the configured URL.
+- **CSV / JSON export** — exports now include a `Webhook` / `webhook_label` column.
 
 ### 1.0.0
 - Initial release.

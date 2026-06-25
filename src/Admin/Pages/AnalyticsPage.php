@@ -113,18 +113,20 @@ final class AnalyticsPage
             wp_send_json_error(['message' => 'Unauthorized.']);
         }
 
-        $page        = max(1, (int) ($_POST['page'] ?? 1));
-        $perPage     = min(100, max(5, (int) ($_POST['per_page'] ?? 10)));
-        $errorsOnly  = isset($_POST['errors_only']) && $_POST['errors_only'] === '1';
-        $search      = sanitize_text_field(wp_unslash($_POST['search']       ?? ''));
-        $filterYear  = sanitize_text_field(wp_unslash($_POST['filter_year']  ?? ''));
-        $filterMonth = sanitize_text_field(wp_unslash($_POST['filter_month'] ?? ''));
+        $page         = max(1, (int) ($_POST['page'] ?? 1));
+        $perPage      = min(100, max(5, (int) ($_POST['per_page'] ?? 10)));
+        $errorsOnly   = isset($_POST['errors_only']) && $_POST['errors_only'] === '1';
+        $search       = sanitize_text_field(wp_unslash($_POST['search']         ?? ''));
+        $filterYear   = sanitize_text_field(wp_unslash($_POST['filter_year']    ?? ''));
+        $filterMonth  = sanitize_text_field(wp_unslash($_POST['filter_month']   ?? ''));
+        $webhookLabel = sanitize_text_field(wp_unslash($_POST['webhook_label']  ?? ''));
 
-        $logs  = $this->logger->getLogsPaginated($page, $perPage, $errorsOnly, $filterYear, $filterMonth, $search);
-        $total = $this->logger->getLogCount($errorsOnly, $filterYear, $filterMonth, $search);
-        $dates = $this->logger->getDistinctDates($errorsOnly);
+        $logs  = $this->logger->getLogsPaginated($page, $perPage, $errorsOnly, $filterYear, $filterMonth, $search, $webhookLabel);
+        $total = $this->logger->getLogCount($errorsOnly, $filterYear, $filterMonth, $search, $webhookLabel);
+        $dates = $this->logger->getDistinctDates($errorsOnly, $webhookLabel);
 
-        $totalPages = max(1, (int) ceil($total / $perPage));
+        $totalPages     = max(1, (int) ceil($total / $perPage));
+        $webhookLabels  = $this->logger->getDistinctWebhookLabels();
 
         $html = '';
         foreach ($logs as $entry) {
@@ -132,12 +134,13 @@ final class AnalyticsPage
         }
 
         wp_send_json_success([
-            'html'        => $html,
-            'total'       => $total,
-            'totalPages'  => $totalPages,
-            'currentPage' => $page,
-            'years'       => $dates['years'],
-            'months'      => $dates['months'],
+            'html'          => $html,
+            'total'         => $total,
+            'totalPages'    => $totalPages,
+            'currentPage'   => $page,
+            'years'         => $dates['years'],
+            'months'        => $dates['months'],
+            'webhookLabels' => $webhookLabels,
         ]);
     }
 
@@ -356,6 +359,7 @@ final class AnalyticsPage
         $requestUrl   = (string) ($entry['request_url'] ?? '');
         $responseCode = (int) ($entry['response_code'] ?? 0);
         $responseData = (string) ($entry['response_data'] ?? '');
+        $webhookLabel = (string) ($entry['webhook_label'] ?? '');
         $dateSlug     = strlen($timestamp) >= 7 ? substr($timestamp, 0, 7) : '';
 
         $requestDecoded = json_decode((string) ($entry['request_data'] ?? '{}'), true);
@@ -372,6 +376,9 @@ final class AnalyticsPage
 
             <div class="fwi-log-meta">
                 <span class="fwi-log-time"><?php echo esc_html($timestamp); ?></span>
+                <?php if ($webhookLabel !== ''): ?>
+                    <span class="fwi-log-webhook-label"><?php echo esc_html($webhookLabel); ?></span>
+                <?php endif; ?>
                 <?php if ($formName !== ''): ?>
                     <span class="fwi-log-form"><?php echo esc_html($formName); ?></span>
                 <?php endif; ?>
@@ -437,7 +444,7 @@ final class AnalyticsPage
 
         fwrite($output, "\xEF\xBB\xBF");
 
-        fputcsv($output, ['ID', 'Date/Time', 'Success', 'Form Name', 'Request URL', 'Response Code', 'Request Data', 'Response Data']);
+        fputcsv($output, ['ID', 'Date/Time', 'Success', 'Webhook', 'Form Name', 'Request URL', 'Response Code', 'Request Data', 'Response Data']);
 
         foreach ($logs as $entry) {
             $requestDecoded = json_decode((string) ($entry['request_data'] ?? '{}'), true);
@@ -447,6 +454,7 @@ final class AnalyticsPage
                 (int) ($entry['id'] ?? 0),
                 $this->escapeCsvCell((string) ($entry['created_at'] ?? '')),
                 (int) ($entry['success'] ?? 0) === 1 ? 'Yes' : 'No',
+                $this->escapeCsvCell((string) ($entry['webhook_label'] ?? '')),
                 $this->escapeCsvCell($formName),
                 $this->escapeCsvCell((string) ($entry['request_url'] ?? '')),
                 (int) ($entry['response_code'] ?? 0),
@@ -501,6 +509,7 @@ final class AnalyticsPage
                 'id'            => (int) ($entry['id'] ?? 0),
                 'created_at'    => (string) ($entry['created_at'] ?? ''),
                 'success'       => (int) ($entry['success'] ?? 0) === 1,
+                'webhook_label' => (string) ($entry['webhook_label'] ?? ''),
                 'form_name'     => is_array($requestDecoded) ? (string) ($requestDecoded['form_name'] ?? '') : '',
                 'request_url'   => (string) ($entry['request_url'] ?? ''),
                 'response_code' => (int) ($entry['response_code'] ?? 0),

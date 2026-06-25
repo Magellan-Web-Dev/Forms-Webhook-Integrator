@@ -167,8 +167,10 @@ final class AdminMenu
             wp_send_json_error(['message' => 'Unauthorized or invalid nonce.']);
         }
 
-        $url    = esc_url_raw(wp_unslash($_POST['url'] ?? ''));
-        $result = $this->webhookTester->test(!empty($url) ? $url : null);
+        $url          = esc_url_raw(wp_unslash($_POST['url'] ?? ''));
+        $webhookIndex = max(0, (int) ($_POST['webhook_index'] ?? 0));
+
+        $result = $this->webhookTester->test(!empty($url) ? $url : null, $webhookIndex);
 
         if ($result['success']) {
             wp_send_json_success(['message' => $result['message']]);

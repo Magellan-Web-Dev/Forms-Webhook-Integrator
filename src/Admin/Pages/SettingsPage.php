@@ -61,13 +61,8 @@ final class SettingsPage
             return;
         }
 
-        $oldUrl = $this->settingsManager->getWebhookUrl();
-
+        // Test-result clearing for changed URLs is handled inside save().
         $this->settingsManager->save(wp_unslash($_POST));
-
-        if ($this->settingsManager->getWebhookUrl() !== $oldUrl) {
-            $this->settingsManager->clearLastTestResult();
-        }
 
         wp_safe_redirect(
             add_query_arg(['page' => 'FWI-settings', 'fwi_saved' => '1'], admin_url('admin.php'))
@@ -91,15 +86,19 @@ final class SettingsPage
             return;
         }
 
-        $saved          = isset($_GET['fwi_saved']) && $_GET['fwi_saved'] === '1';
-        $allForms       = $this->formsHelper->getAllFormNames();
-        $excludedForms  = $this->settingsManager->getExcludedForms();
-        $activeForms    = array_values(array_filter($allForms, fn($f) => !in_array($f, $excludedForms, true)));
-        $queryParams    = $this->settingsManager->getQueryParams();
-        $isActive       = $this->settingsManager->isActive();
-        $webhookUrl     = $this->settingsManager->getWebhookUrl();
-        $lastTestResult = $this->settingsManager->getLastTestResult();
-        $formOverrides  = $this->settingsManager->getFormOverrides();
+        $saved         = isset($_GET['fwi_saved']) && $_GET['fwi_saved'] === '1';
+        $allForms      = $this->formsHelper->getAllFormNames();
+        $excludedForms = $this->settingsManager->getExcludedForms();
+        $activeForms   = array_values(array_filter($allForms, fn($f) => !in_array($f, $excludedForms, true)));
+        $queryParams   = $this->settingsManager->getQueryParams();
+        $isActive      = $this->settingsManager->isActive();
+        $webhooks      = $this->settingsManager->getWebhooks();
+        $formOverrides = $this->settingsManager->getFormOverrides();
+
+        // Ensure at least one (potentially empty) block is rendered.
+        if (empty($webhooks)) {
+            $webhooks = [['url' => '', 'label' => '']];
+        }
 
         ?>
         <div class="wrap fwi-wrap">
@@ -113,7 +112,8 @@ final class SettingsPage
                 <?php wp_nonce_field('fwi_save_settings', 'fwi_settings_nonce'); ?>
 
                 <!-- ── Webhook Status Toggle ───────────────────────────────── -->
-                <div class="fwi-card fwi-toggle-card" id="fwi-webhook-toggle-card"<?php if (empty($webhookUrl)): ?> style="display:none"<?php endif; ?>>
+                <?php $hasAnyUrl = !empty(array_filter(array_column($webhooks, 'url'))); ?>
+                <div class="fwi-card fwi-toggle-card" id="fwi-webhook-toggle-card"<?php if (!$hasAnyUrl): ?> style="display:none"<?php endif; ?>>
                     <h2 class="fwi-card-title">Webhook Status</h2>
                     <div class="fwi-toggle-row">
                         <label class="fwi-toggle" for="fwi_active" aria-label="Toggle webhook active state">
@@ -136,40 +136,72 @@ final class SettingsPage
                 <div class="fwi-card">
                     <h2 class="fwi-card-title">Webhook Settings</h2>
 
-                    <table class="form-table" role="presentation">
+                    <!-- ── Webhook Endpoints ──────────────────────────────── -->
+                    <div id="fwi-webhooks-container">
+                        <p class="description" style="margin-bottom:14px;">
+                            Form submissions are sent to every endpoint listed below. Add a label so each webhook's logs are easy to identify in analytics.
+                        </p>
 
-                        <!-- Webhook URL -->
-                        <tr>
-                            <th scope="row">
-                                <label for="fwi_webhook_url">Webhook URL</label>
-                            </th>
-                            <td>
-                                <div class="fwi-webhook-url-row">
-                                    <input
-                                        type="url"
-                                        id="fwi_webhook_url"
-                                        name="fwi_webhook_url"
-                                        value="<?php echo esc_attr($webhookUrl); ?>"
-                                        class="regular-text"
-                                        placeholder="https://..."
-                                    >
-                                    <button type="button" id="fwi-test-webhook" class="button"<?php echo empty($webhookUrl) ? ' disabled' : ''; ?>>
-                                        Test Webhook
-                                    </button>
-                                </div>
-                                <div id="fwi-test-result" class="fwi-test-result" hidden></div>
-                                <?php if (!empty($lastTestResult)): ?>
-                                    <?php $testOk = !empty($lastTestResult['success']); ?>
-                                    <div class="fwi-last-test <?php echo $testOk ? 'fwi-last-test-success' : 'fwi-last-test-error'; ?>">
-                                        <strong>Last test:</strong>
-                                        <?php echo esc_html($lastTestResult['message'] ?? ''); ?>
-                                        <span class="fwi-last-test-meta">
-                                            — <?php echo esc_html($lastTestResult['time'] ?? ''); ?>
-                                        </span>
-                                    </div>
+                        <?php foreach ($webhooks as $idx => $webhook):
+                            $wUrl       = (string) ($webhook['url']   ?? '');
+                            $wLabel     = (string) ($webhook['label'] ?? '');
+                            $testResult = $this->settingsManager->getWebhookTestResult($idx);
+                            $isFirst    = $idx === 0;
+                        ?>
+                        <div class="fwi-webhook-block" data-webhook-index="<?php echo $idx; ?>">
+                            <div class="fwi-webhook-block-header">
+                                <strong class="fwi-webhook-block-title">Webhook <?php echo ($idx + 1); ?></strong>
+                                <?php if (!$isFirst): ?>
+                                    <button type="button" class="button fwi-remove-webhook-btn" aria-label="Remove webhook <?php echo ($idx + 1); ?>">Remove</button>
                                 <?php endif; ?>
-                            </td>
-                        </tr>
+                            </div>
+
+                            <div class="fwi-webhook-url-row" style="margin-bottom:6px;">
+                                <input
+                                    type="url"
+                                    class="fwi-webhook-url-input regular-text"
+                                    name="fwi_webhooks[<?php echo $idx; ?>][url]"
+                                    value="<?php echo esc_attr($wUrl); ?>"
+                                    placeholder="https://..."
+                                    aria-label="Webhook <?php echo ($idx + 1); ?> URL"
+                                >
+                                <button type="button" class="button fwi-test-webhook-btn" data-webhook-index="<?php echo $idx; ?>"<?php echo empty($wUrl) ? ' disabled' : ''; ?>>
+                                    Test Webhook
+                                </button>
+                            </div>
+
+                            <div class="fwi-webhook-live-result fwi-test-result" hidden></div>
+
+                            <?php if (!empty($testResult)): ?>
+                                <?php $testOk = !empty($testResult['success']); ?>
+                                <div class="fwi-last-test <?php echo $testOk ? 'fwi-last-test-success' : 'fwi-last-test-error'; ?>">
+                                    <strong>Last test:</strong>
+                                    <?php echo esc_html($testResult['message'] ?? ''); ?>
+                                    <span class="fwi-last-test-meta">— <?php echo esc_html($testResult['time'] ?? ''); ?></span>
+                                </div>
+                            <?php endif; ?>
+
+                            <div style="margin-top:8px;">
+                                <input
+                                    type="text"
+                                    class="regular-text fwi-webhook-label-input"
+                                    name="fwi_webhooks[<?php echo $idx; ?>][label]"
+                                    value="<?php echo esc_attr($wLabel); ?>"
+                                    placeholder="Label (optional — shown in analytics)"
+                                    aria-label="Webhook <?php echo ($idx + 1); ?> label"
+                                >
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+
+                        <button type="button" id="fwi-add-webhook" class="button" style="margin-top:12px;">
+                            + Add Additional URL
+                        </button>
+                    </div>
+
+                    <hr style="border:none;border-top:1px solid #f0f0f1;margin:20px 0;">
+
+                    <table class="form-table" role="presentation">
 
                         <!-- Global Headers -->
                         <tr>

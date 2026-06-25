@@ -13,7 +13,7 @@
      * @returns {string}
      */
     function escapeHtml(text) {
-        const node = document.createElement('span');
+        var node = document.createElement('span');
         node.appendChild(document.createTextNode(String(text)));
         return node.innerHTML;
     }
@@ -21,8 +21,8 @@
     // ── Toggle Label ─────────────────────────────────────────────────────────
 
     function initToggleLabel() {
-        const toggle = document.getElementById('fwi_active');
-        const label  = document.getElementById('fwi-toggle-label');
+        var toggle = document.getElementById('fwi_active');
+        var label  = document.getElementById('fwi-toggle-label');
 
         if (!toggle || !label) return;
 
@@ -34,9 +34,9 @@
     // ── Excluded Forms ────────────────────────────────────────────────────────
 
     function initExcludedForms() {
-        const addBtn = document.getElementById('fwi-add-excluded-form');
-        const select = document.getElementById('fwi-form-select');
-        const list   = document.getElementById('fwi-excluded-forms-list');
+        var addBtn = document.getElementById('fwi-add-excluded-form');
+        var select = document.getElementById('fwi-form-select');
+        var list   = document.getElementById('fwi-excluded-forms-list');
 
         if (!addBtn || !select || !list) return;
 
@@ -49,13 +49,13 @@
         });
 
         addBtn.addEventListener('click', function () {
-            const formName = select.value.trim();
+            var formName = select.value.trim();
             if (!formName) return;
 
             // Prevent duplicates
-            const existing = list.querySelectorAll('input[name="fwi_excluded_forms[]"]');
-            for (const input of existing) {
-                if (input.value === formName) return;
+            var existing = list.querySelectorAll('input[name="fwi_excluded_forms[]"]');
+            for (var i = 0; i < existing.length; i++) {
+                if (existing[i].value === formName) return;
             }
 
             appendExcludedForm(formName, list);
@@ -67,22 +67,22 @@
      * @param {HTMLElement} list
      */
     function appendExcludedForm(formName, list) {
-        const emptyMsg = document.getElementById('fwi-no-excluded-forms');
+        var emptyMsg = document.getElementById('fwi-no-excluded-forms');
         if (emptyMsg) emptyMsg.remove();
 
-        const li = document.createElement('li');
+        var li = document.createElement('li');
         li.className = 'fwi-list-item';
 
-        const span = document.createElement('span');
+        var span = document.createElement('span');
         span.className   = 'fwi-item-label';
         span.textContent = formName;
 
-        const input = document.createElement('input');
+        var input = document.createElement('input');
         input.type  = 'hidden';
         input.name  = 'fwi_excluded_forms[]';
         input.value = formName;
 
-        const button = document.createElement('button');
+        var button = document.createElement('button');
         button.type      = 'button';
         button.className = 'button fwi-remove-btn';
         button.setAttribute('aria-label', 'Remove ' + formName);
@@ -105,7 +105,7 @@
      */
     function checkExcludedFormsEmpty(list) {
         if (list.querySelectorAll('.fwi-list-item').length === 0) {
-            const li = document.createElement('li');
+            var li = document.createElement('li');
             li.id        = 'fwi-no-excluded-forms';
             li.className = 'fwi-empty-msg';
             li.textContent = 'All Elementor forms are currently enabled to use the webhook.';
@@ -116,10 +116,10 @@
     // ── Query Parameters ──────────────────────────────────────────────────────
 
     function initQueryParams() {
-        const addBtn     = document.getElementById('fwi-add-param');
-        const keyInput   = document.getElementById('fwi-param-key');
-        const valueInput = document.getElementById('fwi-param-value');
-        const list       = document.getElementById('fwi-query-params-list');
+        var addBtn     = document.getElementById('fwi-add-param');
+        var keyInput   = document.getElementById('fwi-param-key');
+        var valueInput = document.getElementById('fwi-param-value');
+        var list       = document.getElementById('fwi-query-params-list');
 
         if (!addBtn || !keyInput || !valueInput || !list) return;
 
@@ -133,8 +133,8 @@
         });
 
         addBtn.addEventListener('click', function () {
-            const key   = keyInput.value.trim();
-            const value = valueInput.value.trim();
+            var key   = keyInput.value.trim();
+            var value = valueInput.value.trim();
 
             if (!key) {
                 keyInput.focus();
@@ -164,12 +164,12 @@
      * @param {HTMLElement} list
      */
     function appendQueryParam(key, value, list) {
-        const emptyMsg = document.getElementById('fwi-no-query-params');
+        var emptyMsg = document.getElementById('fwi-no-query-params');
         if (emptyMsg) emptyMsg.remove();
 
-        const index = list.querySelectorAll('.fwi-list-item').length;
+        var index = list.querySelectorAll('.fwi-list-item').length;
 
-        const li = document.createElement('li');
+        var li = document.createElement('li');
         li.className = 'fwi-list-item';
         li.innerHTML =
             '<span class="fwi-item-label"><code>' + escapeHtml(key) + '</code> &nbsp;=&nbsp; <code>' + escapeHtml(value) + '</code></span>' +
@@ -193,7 +193,7 @@
      */
     function reindexQueryParams(list) {
         list.querySelectorAll('.fwi-list-item').forEach(function (li, idx) {
-            const hiddenInputs = li.querySelectorAll('input[type="hidden"]');
+            var hiddenInputs = li.querySelectorAll('input[type="hidden"]');
             if (hiddenInputs[0]) hiddenInputs[0].name = 'fwi_query_params[' + idx + '][key]';
             if (hiddenInputs[1]) hiddenInputs[1].name = 'fwi_query_params[' + idx + '][value]';
         });
@@ -204,7 +204,7 @@
      */
     function checkQueryParamsEmpty(list) {
         if (list.querySelectorAll('.fwi-list-item').length === 0) {
-            const li = document.createElement('li');
+            var li = document.createElement('li');
             li.id        = 'fwi-no-query-params';
             li.className = 'fwi-empty-msg';
             li.textContent = 'No query parameters added.';
@@ -217,9 +217,9 @@
     function initAccordions() {
         document.querySelectorAll('.fwi-accordion-header').forEach(function (header) {
             header.addEventListener('click', function () {
-                const isExpanded = header.getAttribute('aria-expanded') === 'true';
-                const bodyId     = header.getAttribute('aria-controls');
-                const body       = bodyId ? document.getElementById(bodyId) : header.nextElementSibling;
+                var isExpanded = header.getAttribute('aria-expanded') === 'true';
+                var bodyId     = header.getAttribute('aria-controls');
+                var body       = bodyId ? document.getElementById(bodyId) : header.nextElementSibling;
 
                 if (!body) return;
 
@@ -234,61 +234,179 @@
         });
     }
 
-    // ── Webhook URL Watcher ───────────────────────────────────────────────────
+    // ── Multi-Webhook Block Management ────────────────────────────────────────
 
     /**
-     * Shows the Webhook Status toggle card only when the URL field has a value,
-     * and enables/disables the Test Webhook button to match.
+     * Watches all .fwi-webhook-url-input fields. Shows the toggle card when any
+     * field has a value; enables/disables each block's Test button to match its
+     * own URL input. Wires the Add/Remove buttons and per-block test buttons.
      */
     function initWebhookUrlWatcher() {
-        const urlInput   = document.getElementById('fwi_webhook_url');
-        const toggleCard = document.getElementById('fwi-webhook-toggle-card');
-        const testBtn    = document.getElementById('fwi-test-webhook');
+        var container  = document.getElementById('fwi-webhooks-container');
+        var toggleCard = document.getElementById('fwi-webhook-toggle-card');
 
-        if (!urlInput) return;
+        if (!container) return;
 
-        function update() {
-            const hasUrl = urlInput.value.trim() !== '';
+        function updateToggleCard() {
+            var inputs = container.querySelectorAll('.fwi-webhook-url-input');
+            var hasAny = false;
+
+            inputs.forEach(function (inp) {
+                var hasValue = inp.value.trim() !== '';
+                if (hasValue) hasAny = true;
+
+                var block   = inp.closest('.fwi-webhook-block');
+                var testBtn = block ? block.querySelector('.fwi-test-webhook-btn') : null;
+                if (testBtn) testBtn.disabled = !hasValue;
+            });
 
             if (toggleCard) {
-                toggleCard.style.display = hasUrl ? '' : 'none';
-                const checkbox = toggleCard.querySelector('input[type="checkbox"]');
-                if (checkbox) {
-                    checkbox.disabled = !hasUrl;
-                }
-            }
-
-            if (testBtn) {
-                testBtn.disabled = !hasUrl;
+                toggleCard.style.display = hasAny ? '' : 'none';
+                var checkbox = toggleCard.querySelector('input[type="checkbox"]');
+                if (checkbox) checkbox.disabled = !hasAny;
             }
         }
 
-        urlInput.addEventListener('input', update);
-        update();
+        // Store for use by dynamically-added blocks.
+        container._fwiUpdateToggle = updateToggleCard;
+
+        // Wire live input events for server-rendered blocks.
+        container.querySelectorAll('.fwi-webhook-url-input').forEach(function (inp) {
+            inp.addEventListener('input', updateToggleCard);
+        });
+
+        // Wire remove buttons for server-rendered additional blocks.
+        container.querySelectorAll('.fwi-remove-webhook-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                btn.closest('.fwi-webhook-block').remove();
+                reindexWebhookBlocks(container);
+                updateToggleCard();
+            });
+        });
+
+        // Wire server-rendered test buttons.
+        container.querySelectorAll('.fwi-test-webhook-btn').forEach(function (btn) {
+            wireTestButton(btn);
+        });
+
+        // "Add Additional URL" button.
+        var addBtn = document.getElementById('fwi-add-webhook');
+        if (addBtn) {
+            addBtn.addEventListener('click', function () {
+                var newBlock = buildWebhookBlock(container.querySelectorAll('.fwi-webhook-block').length);
+                addBtn.parentNode.insertBefore(newBlock, addBtn);
+                newBlock.querySelector('.fwi-webhook-url-input').focus();
+                updateToggleCard();
+            });
+        }
+
+        updateToggleCard();
     }
 
-    // ── Test Webhook Button ───────────────────────────────────────────────────
+    /**
+     * Builds and returns a new webhook block DOM element for the given index.
+     *
+     * @param {number} index
+     * @returns {HTMLElement}
+     */
+    function buildWebhookBlock(index) {
+        var block = document.createElement('div');
+        block.className = 'fwi-webhook-block';
+        block.dataset.webhookIndex = index;
 
-    function initTestWebhookButton() {
-        const testBtn = document.getElementById('fwi-test-webhook');
+        block.innerHTML =
+            '<div class="fwi-webhook-block-header">' +
+                '<strong class="fwi-webhook-block-title">Webhook ' + (index + 1) + '</strong>' +
+                '<button type="button" class="button fwi-remove-webhook-btn" aria-label="Remove webhook ' + (index + 1) + '">Remove</button>' +
+            '</div>' +
+            '<div class="fwi-webhook-url-row" style="margin-bottom:6px;">' +
+                '<input type="url" class="fwi-webhook-url-input regular-text"' +
+                    ' name="fwi_webhooks[' + index + '][url]"' +
+                    ' placeholder="https://..."' +
+                    ' aria-label="Webhook ' + (index + 1) + ' URL">' +
+                '<button type="button" class="button fwi-test-webhook-btn"' +
+                    ' data-webhook-index="' + index + '" disabled>Test Webhook</button>' +
+            '</div>' +
+            '<div class="fwi-webhook-live-result fwi-test-result" hidden></div>' +
+            '<div style="margin-top:8px;">' +
+                '<input type="text" class="regular-text fwi-webhook-label-input"' +
+                    ' name="fwi_webhooks[' + index + '][label]"' +
+                    ' placeholder="Label (optional — shown in analytics)"' +
+                    ' aria-label="Webhook ' + (index + 1) + ' label">' +
+            '</div>';
+
+        block.querySelector('.fwi-remove-webhook-btn').addEventListener('click', function () {
+            var cont = document.getElementById('fwi-webhooks-container');
+            block.remove();
+            reindexWebhookBlocks(cont);
+            if (cont && cont._fwiUpdateToggle) cont._fwiUpdateToggle();
+        });
+
+        block.querySelector('.fwi-webhook-url-input').addEventListener('input', function () {
+            var cont = document.getElementById('fwi-webhooks-container');
+            if (cont && cont._fwiUpdateToggle) cont._fwiUpdateToggle();
+        });
+
+        wireTestButton(block.querySelector('.fwi-test-webhook-btn'));
+
+        return block;
+    }
+
+    /**
+     * Re-indexes name attributes and titles after a block is added or removed.
+     *
+     * @param {HTMLElement} container
+     */
+    function reindexWebhookBlocks(container) {
+        container.querySelectorAll('.fwi-webhook-block').forEach(function (block, idx) {
+            block.dataset.webhookIndex = idx;
+
+            var title = block.querySelector('.fwi-webhook-block-title');
+            if (title) title.textContent = 'Webhook ' + (idx + 1);
+
+            var urlInput = block.querySelector('.fwi-webhook-url-input');
+            if (urlInput) urlInput.name = 'fwi_webhooks[' + idx + '][url]';
+
+            var labelInput = block.querySelector('.fwi-webhook-label-input');
+            if (labelInput) labelInput.name = 'fwi_webhooks[' + idx + '][label]';
+
+            var testBtn = block.querySelector('.fwi-test-webhook-btn');
+            if (testBtn) testBtn.dataset.webhookIndex = idx;
+
+            // First block never has a Remove button shown.
+            var removeBtn = block.querySelector('.fwi-remove-webhook-btn');
+            if (removeBtn) removeBtn.style.display = idx === 0 ? 'none' : '';
+        });
+    }
+
+    /**
+     * Attaches the AJAX click handler to a webhook block's Test button.
+     *
+     * @param {HTMLButtonElement} testBtn
+     */
+    function wireTestButton(testBtn) {
         if (!testBtn) return;
 
         testBtn.addEventListener('click', function () {
-            const urlInput = document.getElementById('fwi_webhook_url');
-            const url      = urlInput ? urlInput.value.trim() : '';
+            var block        = testBtn.closest('.fwi-webhook-block');
+            var urlInput     = block ? block.querySelector('.fwi-webhook-url-input') : null;
+            var resultEl     = block ? block.querySelector('.fwi-webhook-live-result') : null;
+            var webhookIndex = parseInt(testBtn.dataset.webhookIndex || '0', 10);
+            var url          = urlInput ? urlInput.value.trim() : '';
 
             if (!url) {
-                showTestResult(false, 'Please enter a webhook URL first.');
+                showBlockTestResult(resultEl, false, 'Please enter a webhook URL first.');
                 return;
             }
 
             testBtn.disabled    = true;
-            testBtn.textContent = 'Testing\u2026';
+            testBtn.textContent = 'Testing…';
 
-            const body = new FormData();
-            body.append('action', 'fwi_test_webhook');
-            body.append('nonce',  (typeof FWI !== 'undefined' && FWI.testNonce) ? FWI.testNonce : '');
-            body.append('url',    url);
+            var body = new FormData();
+            body.append('action',        'fwi_test_webhook');
+            body.append('nonce',         (typeof FWI !== 'undefined' && FWI.testNonce) ? FWI.testNonce : '');
+            body.append('url',           url);
+            body.append('webhook_index', webhookIndex);
 
             fetch((typeof FWI !== 'undefined' && FWI.ajaxUrl) ? FWI.ajaxUrl : ajaxurl, {
                 method: 'POST',
@@ -298,25 +416,26 @@
             .then(function (response) {
                 testBtn.disabled    = false;
                 testBtn.textContent = 'Test Webhook';
-                showTestResult(response.success, response.success ? response.data.message : response.data.message);
+                showBlockTestResult(resultEl, response.success, response.data ? response.data.message : 'Unknown error');
             })
             .catch(function (err) {
                 testBtn.disabled    = false;
                 testBtn.textContent = 'Test Webhook';
-                showTestResult(false, 'Request failed: ' + err.message);
+                showBlockTestResult(resultEl, false, 'Request failed: ' + err.message);
             });
         });
     }
 
     /**
-     * @param {boolean} success
-     * @param {string}  message
+     * Shows a test result inside the given webhook block result element.
+     *
+     * @param {HTMLElement|null} el
+     * @param {boolean}          success
+     * @param {string}           message
      */
-    function showTestResult(success, message) {
-        const el = document.getElementById('fwi-test-result');
+    function showBlockTestResult(el, success, message) {
         if (!el) return;
-
-        el.className  = 'fwi-test-result ' + (success ? 'fwi-test-success' : 'fwi-test-error');
+        el.className   = 'fwi-webhook-live-result fwi-test-result ' + (success ? 'fwi-test-success' : 'fwi-test-error');
         el.textContent = message;
         el.hidden      = false;
     }
@@ -324,10 +443,10 @@
     // ── Webhook Headers ───────────────────────────────────────────────────────
 
     function initWebhookHeaders() {
-        const addBtn     = document.getElementById('fwi-add-header');
-        const keyInput   = document.getElementById('fwi-header-key');
-        const valueInput = document.getElementById('fwi-header-value');
-        const list       = document.getElementById('fwi-webhook-headers-list');
+        var addBtn     = document.getElementById('fwi-add-header');
+        var keyInput   = document.getElementById('fwi-header-key');
+        var valueInput = document.getElementById('fwi-header-value');
+        var list       = document.getElementById('fwi-webhook-headers-list');
 
         if (!addBtn || !keyInput || !valueInput || !list) return;
 
@@ -340,8 +459,8 @@
         });
 
         addBtn.addEventListener('click', function () {
-            const key   = keyInput.value.trim();
-            const value = valueInput.value.trim();
+            var key   = keyInput.value.trim();
+            var value = valueInput.value.trim();
 
             if (!key) {
                 keyInput.focus();
@@ -370,12 +489,12 @@
      * @param {HTMLElement} list
      */
     function appendWebhookHeader(key, value, list) {
-        const emptyMsg = document.getElementById('fwi-no-webhook-headers');
+        var emptyMsg = document.getElementById('fwi-no-webhook-headers');
         if (emptyMsg) emptyMsg.remove();
 
-        const index = list.querySelectorAll('.fwi-list-item').length;
+        var index = list.querySelectorAll('.fwi-list-item').length;
 
-        const li = document.createElement('li');
+        var li = document.createElement('li');
         li.className = 'fwi-list-item';
         li.innerHTML =
             '<span class="fwi-item-label"><code>' + escapeHtml(key) + '</code> &nbsp;=&nbsp; <code>' + escapeHtml(value) + '</code></span>' +
@@ -397,7 +516,7 @@
      */
     function reindexWebhookHeaders(list) {
         list.querySelectorAll('.fwi-list-item').forEach(function (li, idx) {
-            const inputs = li.querySelectorAll('input[type="hidden"]');
+            var inputs = li.querySelectorAll('input[type="hidden"]');
             if (inputs[0]) inputs[0].name = 'fwi_webhook_headers[' + idx + '][key]';
             if (inputs[1]) inputs[1].name = 'fwi_webhook_headers[' + idx + '][value]';
         });
@@ -408,7 +527,7 @@
      */
     function checkWebhookHeadersEmpty(list) {
         if (list.querySelectorAll('.fwi-list-item').length === 0) {
-            const li       = document.createElement('li');
+            var li       = document.createElement('li');
             li.id          = 'fwi-no-webhook-headers';
             li.className   = 'fwi-empty-msg';
             li.textContent = 'No custom headers added.';
@@ -549,12 +668,12 @@
             var errorsOnly  = body.dataset.errorsOnly === '1';
             var initialized = false;
             var dirty       = false;
-            var state       = { page: 1, perPage: 10, search: '', year: '', month: '' };
+            var state       = { page: 1, perPage: 10, search: '', year: '', month: '', webhookLabel: '' };
 
             // Inject controls bar, list, and pagination container once.
             var controls = document.createElement('div');
             controls.className = 'fwi-acc-controls';
-            controls.innerHTML = buildControlsHtml([], []);
+            controls.innerHTML = buildControlsHtml();
             body.appendChild(controls);
 
             var list = document.createElement('ul');
@@ -572,6 +691,9 @@
             controls.querySelector('.fwi-filter-month').addEventListener('change', function () {
                 state.month = this.value; state.page = 1; fetchLogs();
             });
+            controls.querySelector('.fwi-filter-webhook').addEventListener('change', function () {
+                state.webhookLabel = this.value; state.page = 1; fetchLogs();
+            });
             controls.querySelector('.fwi-per-page').addEventListener('change', function () {
                 state.perPage = parseInt(this.value, 10); state.page = 1; fetchLogs();
             });
@@ -584,8 +706,6 @@
             });
 
             // ── Fetch on accordion open ───────────────────────────────────────
-            // initAccordions() fires first (registered earlier), so aria-expanded
-            // is already updated when this listener runs.
             header.addEventListener('click', function () {
                 var isOpen = header.getAttribute('aria-expanded') === 'true';
                 if (isOpen && (!initialized || dirty)) {
@@ -604,7 +724,7 @@
                 if (!confirm('Delete this log entry? This cannot be undone.')) return;
 
                 btn.disabled    = true;
-                btn.textContent = '\u2026';
+                btn.textContent = '…';
 
                 var fd = new FormData();
                 fd.append('action', 'fwi_delete_log');
@@ -623,7 +743,6 @@
                             var count = parseInt(badge.textContent, 10);
                             if (!isNaN(count) && count > 0) badge.textContent = String(count - 1);
                         }
-                        // Re-fetch current page; mark all other accordions dirty.
                         fetchLogs();
                         document.dispatchEvent(new CustomEvent('fwi:log-deleted', { detail: { logId: logId } }));
                     } else {
@@ -645,18 +764,19 @@
 
             // ── Core fetch ────────────────────────────────────────────────────
             function fetchLogs() {
-                list.innerHTML        = '<li class="fwi-empty-msg">Loading\u2026</li>';
+                list.innerHTML        = '<li class="fwi-empty-msg">Loading…</li>';
                 paginationEl.innerHTML = '';
 
                 var fd = new FormData();
-                fd.append('action',       'fwi_get_logs');
-                fd.append('nonce',        (typeof FWI !== 'undefined' && FWI.logsNonce)  ? FWI.logsNonce  : '');
-                fd.append('page',         state.page);
-                fd.append('per_page',     state.perPage);
-                fd.append('search',       state.search);
-                fd.append('filter_year',  state.year);
-                fd.append('filter_month', state.month);
-                fd.append('errors_only',  errorsOnly ? '1' : '0');
+                fd.append('action',        'fwi_get_logs');
+                fd.append('nonce',         (typeof FWI !== 'undefined' && FWI.logsNonce)  ? FWI.logsNonce  : '');
+                fd.append('page',          state.page);
+                fd.append('per_page',      state.perPage);
+                fd.append('search',        state.search);
+                fd.append('filter_year',   state.year);
+                fd.append('filter_month',  state.month);
+                fd.append('webhook_label', state.webhookLabel);
+                fd.append('errors_only',   errorsOnly ? '1' : '0');
 
                 fetch((typeof FWI !== 'undefined' && FWI.ajaxUrl) ? FWI.ajaxUrl : ajaxurl, {
                     method: 'POST',
@@ -671,8 +791,11 @@
                     var data = resp.data;
 
                     if (!initialized) {
-                        updateFilterOptions(controls, data.years || [], data.months || []);
+                        updateFilterOptions(controls, data.years || [], data.months || [], data.webhookLabels || []);
                         initialized = true;
+                    } else {
+                        // Update webhook labels in case new webhooks were added.
+                        updateWebhookLabelOptions(controls, data.webhookLabels || []);
                     }
                     dirty = false;
 
@@ -695,18 +818,19 @@
     }
 
     /**
-     * Populates the year and month filter dropdowns from server-returned arrays.
+     * Populates the year, month, and webhook-label filter dropdowns.
      *
      * @param {HTMLElement} controls
-     * @param {string[]}    years    Unique years, newest first.
-     * @param {string[]}    months   Unique two-digit month strings, ascending.
+     * @param {string[]}    years
+     * @param {string[]}    months
+     * @param {string[]}    webhookLabels
      */
-    function updateFilterOptions(controls, years, months) {
+    function updateFilterOptions(controls, years, months, webhookLabels) {
         var MONTH_NAMES = ['January','February','March','April','May','June',
                            'July','August','September','October','November','December'];
 
-        var yearSelect  = controls.querySelector('.fwi-filter-year');
-        var monthSelect = controls.querySelector('.fwi-filter-month');
+        var yearSelect    = controls.querySelector('.fwi-filter-year');
+        var monthSelect   = controls.querySelector('.fwi-filter-month');
 
         yearSelect.innerHTML = '<option value="">All Years</option>';
         years.forEach(function (y) {
@@ -718,12 +842,38 @@
             var name = MONTH_NAMES[parseInt(m, 10) - 1] || m;
             monthSelect.innerHTML += '<option value="' + escapeHtml(m) + '">' + escapeHtml(name) + '</option>';
         });
+
+        updateWebhookLabelOptions(controls, webhookLabels);
+    }
+
+    /**
+     * Refreshes just the webhook-label select options, preserving the current selection.
+     *
+     * @param {HTMLElement} controls
+     * @param {string[]}    webhookLabels
+     */
+    function updateWebhookLabelOptions(controls, webhookLabels) {
+        var webhookSelect = controls.querySelector('.fwi-filter-webhook');
+        if (!webhookSelect) return;
+
+        var currentVal = webhookSelect.value;
+
+        webhookSelect.innerHTML = '<option value="">All Webhooks</option>';
+        webhookLabels.forEach(function (lbl) {
+            var opt = document.createElement('option');
+            opt.value       = lbl;
+            opt.textContent = lbl;
+            if (lbl === currentVal) opt.selected = true;
+            webhookSelect.appendChild(opt);
+        });
+
+        // Hide the filter when there is only one distinct label (or none).
+        webhookSelect.parentElement.style.display = webhookLabels.length > 1 ? '' : 'none';
     }
 
     /**
      * Returns the HTML string for the controls bar.
-     * Year/month options start empty; updateFilterOptions() fills them after
-     * the first AJAX response.
+     * Year/month/webhook options start empty; updateFilterOptions() fills them.
      *
      * @returns {string}
      */
@@ -731,9 +881,10 @@
         return '<div class="fwi-acc-filters">' +
                    '<select class="fwi-filter-year"><option value="">All Years</option></select>' +
                    '<select class="fwi-filter-month"><option value="">All Months</option></select>' +
+                   '<span style="display:none"><select class="fwi-filter-webhook"><option value="">All Webhooks</option></select></span>' +
                    '<div class="fwi-acc-search">' +
-                       '<input type="text" class="fwi-search-input" placeholder="Search request data\u2026" />' +
-                       '<button type="button" class="fwi-search-clear" aria-label="Clear search">\u2715</button>' +
+                       '<input type="text" class="fwi-search-input" placeholder="Search request data…" />' +
+                       '<button type="button" class="fwi-search-clear" aria-label="Clear search">✕</button>' +
                    '</div>' +
                '</div>' +
                '<div class="fwi-acc-perpage">' +
@@ -956,7 +1107,6 @@
         initQueryParams();
         initAccordions();
         initWebhookUrlWatcher();
-        initTestWebhookButton();
         initWebhookHeaders();
         initFormOverrideBuilders();
         initAnalyticsPagination();

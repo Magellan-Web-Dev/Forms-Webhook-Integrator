@@ -47,7 +47,7 @@ final class DatabaseManager
      * definition changes so that maybeCreateTable() triggers a dbDelta run
      * for existing installations.
      */
-    private const DB_VERSION = '5.0';
+    private const DB_VERSION = '6.0';
 
     /**
      * Returns the fully-qualified table name including the WordPress database prefix.
@@ -100,6 +100,7 @@ final class DatabaseManager
         $sql = "CREATE TABLE {$tableName} (
             id bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
             success tinyint(1) NOT NULL DEFAULT 0,
+            webhook_label varchar(255) NOT NULL DEFAULT '',
             request_url text NOT NULL,
             request_data longtext NOT NULL,
             response_data longtext NOT NULL,
@@ -107,6 +108,7 @@ final class DatabaseManager
             created_at datetime NOT NULL,
             PRIMARY KEY  (id),
             KEY idx_success (success),
+            KEY idx_webhook_label (webhook_label(100)),
             KEY idx_response_code (response_code),
             KEY idx_created_at (created_at)
             ) {$charsetCollate};

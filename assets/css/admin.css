@@ -767,3 +767,78 @@ input[type="checkbox"] {
     line-height: 1.7;
     margin-bottom: 4px;
 }
+
+/* ── Settings: Multi-webhook Blocks ──────────────────────────────────────────── */
+
+#fwi-webhooks-container {
+    margin-bottom: 16px;
+}
+
+.fwi-webhook-block {
+    background: #f6f7f7;
+    border: 1px solid #dcdcde;
+    border-radius: 4px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+}
+
+.fwi-webhook-block-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.fwi-webhook-block-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1d2327;
+}
+
+.fwi-remove-webhook-btn {
+    color: #d63638 !important;
+    border-color: #d63638 !important;
+    padding: 1px 10px !important;
+    height: 24px;
+    font-size: 12px;
+    line-height: 22px;
+}
+
+.fwi-remove-webhook-btn:hover {
+    background: #d63638 !important;
+    color: #fff !important;
+}
+
+.fwi-webhook-url-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+}
+
+.fwi-webhook-url-row .fwi-webhook-url-input {
+    flex: 1;
+    min-width: 220px;
+    max-width: 400px;
+}
+
+#fwi-add-webhook {
+    margin-top: 4px;
+}
+
+/* ── Analytics: Webhook label badge ──────────────────────────────────────────── */
+
+.fwi-log-webhook-label {
+    display: inline-block;
+    padding: 1px 8px;
+    background: #e8f0fb;
+    border: 1px solid #b3c8f0;
+    border-radius: 3px;
+    color: #2271b1;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 4px;
+}

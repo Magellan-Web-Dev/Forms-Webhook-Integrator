@@ -25,21 +25,25 @@ final class WebhookTester
     ) {}
 
     /**
-     * Performs the test request and saves the result.
+     * Performs a test POST to the given URL and saves the outcome per webhook index.
      *
-     * Uses the fully-qualified webhook URL (base URL + query params) and any
-     * custom headers currently saved in settings. Considers HTTP 200 and 201
-     * as success; any transport error or other status code is a failure.
+     * Uses any custom headers currently saved in settings. Considers HTTP 200,
+     * 201, 202, and 204 as success; any transport error or other code is a failure.
      *
-     * @param string|null $url Override the saved URL (e.g. when testing an
-     *                         unsaved value from the settings form). When null
-     *                         the saved URL is used.
+     * @param string|null $url          Override the URL to test. When null, uses the
+     *                                  saved URL for the given webhook index.
+     * @param int         $webhookIndex 0-based index into the webhooks array; used to
+     *                                  persist the result to the correct slot.
      *
      * @return array{success: bool, message: string}
      */
-    public function test(?string $url = null): array
+    public function test(?string $url = null, int $webhookIndex = 0): array
     {
-        $url = $url ?? $this->settings->buildWebhookUrl();
+        if ($url === null) {
+            $webhooks = $this->settings->getWebhooks();
+            $webhook  = $webhooks[$webhookIndex] ?? null;
+            $url      = $webhook !== null ? $this->settings->buildWebhookUrlForWebhook($webhook) : '';
+        }
 
         if (empty($url)) {
             return ['success' => false, 'message' => 'No webhook URL configured.'];
@@ -66,14 +70,15 @@ final class WebhookTester
             ];
         } else {
             $code    = (int) wp_remote_retrieve_response_code($response);
-            $success = ($code === 200 || $code === 201 || $code === 202 || $code === 204);
+            $success = in_array($code, [200, 201, 202, 204], true);
             $result  = [
                 'success' => $success,
                 'message' => 'HTTP ' . $code . ($success ? ' — Test passed.' : ' — Test failed.'),
             ];
         }
 
-        $this->settings->saveLastTestResult(
+        $this->settings->saveWebhookTestResult(
+            webhookIndex: $webhookIndex,
             success: $result['success'],
             message: $result['message'],
             testedUrl: $url

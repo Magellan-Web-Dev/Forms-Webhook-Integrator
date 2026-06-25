@@ -46,7 +46,8 @@ final class WebhookLogger
         array $requestData,
         string $requestUrl,
         int $responseCode,
-        string $responseData
+        string $responseData,
+        string $webhookLabel = ''
     ): void {
         global $wpdb;
 
@@ -68,14 +69,35 @@ final class WebhookLogger
             DatabaseManager::getTableName(),
             [
                 'success'       => in_array($responseCode, [200, 201, 202, 204], true) ? 1 : 0,
+                'webhook_label' => $webhookLabel,
                 'request_url'   => $this->redactSensitiveUrl($requestUrl),
                 'request_data'  => $encoded,
                 'response_data' => $responseData,
                 'response_code' => $responseCode,
                 'created_at'    => current_time('mysql', true),
             ],
-            ['%d', '%s', '%s', '%s', '%d', '%s']
+            ['%d', '%s', '%s', '%s', '%s', '%d', '%s']
         );
+    }
+
+    /**
+     * Returns the distinct non-empty webhook labels present in the log table.
+     *
+     * Used to populate the webhook filter dropdown on the analytics page.
+     *
+     * @return list<string>
+     */
+    public function getDistinctWebhookLabels(): array
+    {
+        global $wpdb;
+
+        $table = DatabaseManager::getTableName();
+
+        $rows = $wpdb->get_col( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+            "SELECT DISTINCT webhook_label FROM `{$table}` WHERE webhook_label != '' ORDER BY webhook_label ASC"
+        );
+
+        return is_array($rows) ? array_values(array_filter($rows, 'is_string')) : [];
     }
 
     /**
@@ -117,14 +139,15 @@ final class WebhookLogger
         bool $errorsOnly = false,
         string $filterYear = '',
         string $filterMonth = '',
-        string $search = ''
+        string $search = '',
+        string $webhookLabel = ''
     ): array {
         global $wpdb;
 
         $table  = DatabaseManager::getTableName();
         $offset = ($page - 1) * $perPage;
 
-        [$where, $values] = $this->buildWhereClause($errorsOnly, $filterYear, $filterMonth, $search);
+        [$where, $values] = $this->buildWhereClause($errorsOnly, $filterYear, $filterMonth, $search, $webhookLabel);
 
         $values[] = $perPage;
         $values[] = $offset;
@@ -146,6 +169,7 @@ final class WebhookLogger
      * @param string $filterYear
      * @param string $filterMonth
      * @param string $search
+     * @param string $webhookLabel
      *
      * @return int
      */
@@ -153,13 +177,14 @@ final class WebhookLogger
         bool $errorsOnly = false,
         string $filterYear = '',
         string $filterMonth = '',
-        string $search = ''
+        string $search = '',
+        string $webhookLabel = ''
     ): int {
         global $wpdb;
 
         $table = DatabaseManager::getTableName();
 
-        [$where, $values] = $this->buildWhereClause($errorsOnly, $filterYear, $filterMonth, $search);
+        [$where, $values] = $this->buildWhereClause($errorsOnly, $filterYear, $filterMonth, $search, $webhookLabel);
 
         $sql = "SELECT COUNT(*) FROM `{$table}` {$where}";
 
@@ -174,20 +199,33 @@ final class WebhookLogger
      * Returns the distinct calendar years and months that have log entries,
      * for populating the analytics page filter dropdowns.
      *
-     * @param bool $errorsOnly When true, only considers error rows.
+     * @param bool   $errorsOnly   When true, only considers error rows.
+     * @param string $webhookLabel When non-empty, only considers rows with this label.
      *
      * @return array{years: list<string>, months: list<string>}
      */
-    public function getDistinctDates(bool $errorsOnly = false): array
+    public function getDistinctDates(bool $errorsOnly = false, string $webhookLabel = ''): array
     {
         global $wpdb;
 
-        $table = DatabaseManager::getTableName();
-        $where = $errorsOnly ? 'WHERE success = 0' : '';
+        $table      = DatabaseManager::getTableName();
+        $conditions = [];
+        $values     = [];
 
-        $rows = $wpdb->get_col( // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-            "SELECT DISTINCT DATE_FORMAT(created_at, '%Y-%m') FROM `{$table}` {$where} ORDER BY 1 DESC"
-        );
+        if ($errorsOnly) {
+            $conditions[] = 'success = 0';
+        }
+        if ($webhookLabel !== '') {
+            $conditions[] = 'webhook_label = %s';
+            $values[]     = $webhookLabel;
+        }
+
+        $where = $conditions ? 'WHERE ' . implode(' AND ', $conditions) : '';
+
+        $sql  = "SELECT DISTINCT DATE_FORMAT(created_at, '%Y-%m') FROM `{$table}` {$where} ORDER BY 1 DESC";
+        $rows = $values
+            ? $wpdb->get_col($wpdb->prepare($sql, $values)) // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.NotPrepared
+            : $wpdb->get_col($sql); // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
         if (!is_array($rows)) {
             return ['years' => [], 'months' => []];
@@ -321,7 +359,8 @@ final class WebhookLogger
         bool $errorsOnly,
         string $filterYear,
         string $filterMonth,
-        string $search
+        string $search,
+        string $webhookLabel = ''
     ): array {
         global $wpdb;
 
@@ -345,6 +384,11 @@ final class WebhookLogger
         if ($search !== '') {
             $conditions[] = 'request_data LIKE %s';
             $values[]     = '%' . $wpdb->esc_like($search) . '%';
+        }
+
+        if ($webhookLabel !== '') {
+            $conditions[] = 'webhook_label = %s';
+            $values[]     = $webhookLabel;
         }
 
         $where = $conditions ? 'WHERE ' . implode(' AND ', $conditions) : '';
