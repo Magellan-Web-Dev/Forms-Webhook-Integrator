@@ -203,6 +203,38 @@ final class SettingsPage
 
                     <table class="form-table" role="presentation">
 
+                        <!-- Webhook Failure Mode -->
+                        <tr>
+                            <th scope="row">Webhook Failure Mode</th>
+                            <td>
+                                <?php $failureMode = $this->settingsManager->getFailureMode(); ?>
+                                <fieldset>
+                                    <legend class="screen-reader-text"><span>Webhook Failure Mode</span></legend>
+                                    <label style="display:block;margin-bottom:8px;">
+                                        <input
+                                            type="radio"
+                                            name="fwi_failure_mode"
+                                            value="retry"
+                                            <?php checked($failureMode, 'retry'); ?>
+                                        >
+                                        <strong>Retry in background</strong> — the visitor sees a successful submission; failed webhook deliveries are retried automatically up to 2 more times, about 2 hours apart.
+                                    </label>
+                                    <label style="display:block;">
+                                        <input
+                                            type="radio"
+                                            name="fwi_failure_mode"
+                                            value="show_error"
+                                            <?php checked($failureMode, 'show_error'); ?>
+                                        >
+                                        <strong>Show error to visitor</strong> — the form displays an error message when a webhook delivery fails.
+                                    </label>
+                                    <p class="description" style="margin-top:8px;">
+                                        Applies to Elementor form submissions only. Every attempt is recorded in Analytics. Submissions blocked by the outside-US setting always show an error and are never retried.
+                                    </p>
+                                </fieldset>
+                            </td>
+                        </tr>
+
                         <!-- Global Headers -->
                         <tr>
                             <th scope="row">Global Headers</th>

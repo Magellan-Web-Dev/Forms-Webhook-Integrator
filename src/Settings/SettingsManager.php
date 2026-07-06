@@ -59,6 +59,15 @@ final class SettingsManager
     public const OPTION_BLOCK_OUTSIDE_US = 'FWI_block_outside_us';
 
     /**
+     * WordPress option key: what happens when a webhook delivery fails for an
+     * Elementor form submission. 'retry' (default) shows success to the visitor
+     * and retries the failed deliveries in the background; 'show_error' surfaces
+     * the error on the form. Submissions via the fwi_submission action or
+     * fwi_submit_form() are unaffected by this setting.
+     */
+    public const OPTION_FAILURE_MODE = 'FWI_failure_mode';
+
+    /**
      * WordPress option key: list of Elementor form names excluded from the webhook.
      */
     public const OPTION_EXCLUDED_FORMS = 'FWI_excluded_forms';
@@ -276,6 +285,20 @@ final class SettingsManager
     public function isBlockOutsideUs(): bool
     {
         return (bool) get_option(self::OPTION_BLOCK_OUTSIDE_US, true);
+    }
+
+    /**
+     * Returns the failure mode for Elementor form submissions.
+     *
+     * Whitelisted to the two known values: any unset or corrupt stored value
+     * degrades to the default 'retry'.
+     *
+     * @return string Either 'retry' or 'show_error'.
+     */
+    public function getFailureMode(): string
+    {
+        $mode = (string) get_option(self::OPTION_FAILURE_MODE, 'retry');
+        return $mode === 'show_error' ? 'show_error' : 'retry';
     }
 
     /**
@@ -588,6 +611,11 @@ final class SettingsManager
         update_option(
             self::OPTION_INCLUDE_PAGE_PARAMS,
             isset($data['fwi_include_page_params']) && $data['fwi_include_page_params'] === '1'
+        );
+
+        update_option(
+            self::OPTION_FAILURE_MODE,
+            (($data['fwi_failure_mode'] ?? '') === 'show_error') ? 'show_error' : 'retry'
         );
 
         $retentionMonths = isset($data['fwi_log_retention_months']) ? (int) $data['fwi_log_retention_months'] : 3;

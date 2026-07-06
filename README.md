@@ -1,6 +1,6 @@
 # Forms Webhook Integrator
 
-A WordPress plugin that forwards Elementor Pro form submissions — and any other form — to one or more configurable webhook endpoints as a structured JSON payload. Includes an admin settings UI, per-endpoint analytics logging with label-based filtering, a read-only REST API, and automatic updates from GitHub releases.
+A WordPress plugin that forwards Elementor Pro form submissions — and any other form — to one or more configurable webhook endpoints as a structured JSON payload. Includes an admin settings UI, automatic background retries for failed deliveries, per-endpoint analytics logging with label-based filtering, a read-only REST API, and automatic updates from GitHub releases.
 
 ---
 
@@ -53,6 +53,7 @@ Each webhook block contains:
 
 | Field | Description |
 |---|---|
+| **Webhook Failure Mode** | What happens when a webhook delivery fails for an **Elementor form** submission. **Retry in background** (default): the visitor still sees a successful submission and the failed delivery is retried automatically in the background. **Show error to visitor**: the form displays an error message immediately. See [Failure Handling & Background Retries](#failure-handling--background-retries). |
 | **Global Headers** | Custom HTTP headers included on every webhook request to every endpoint (e.g. `Authorization: Bearer …`). Added via a key/value builder; any header here is merged after `Content-Type: application/json`. |
 | **Global URL Query Parameters** | Key/value pairs appended as a query string to every webhook URL on every request. Also includes an **Include Page URL Parameters** checkbox — when enabled, any query parameters present in the URL of the page where the form was submitted (e.g. `?utm_source=google&gclid=…`) are automatically appended to the webhook URL on every form submission. |
 | **Client First Name** | Embedded in the `website_info.client` block of every payload. |
@@ -141,6 +142,25 @@ HTTP `200`, `201`, `202`, and `204` responses are treated as success. Any other 
 
 ---
 
+## Failure Handling & Background Retries
+
+The **Webhook Failure Mode** setting controls what an Elementor form visitor experiences when one or more webhook deliveries fail (for example, when an endpoint is temporarily down):
+
+- **Retry in background** (default) — the form shows its normal success state, so visitors never see an error for a temporary outage and are not tempted to re-submit. Each failed delivery is retried automatically: a second attempt roughly **2 hours** after the submission, and — if that also fails — a third and final attempt roughly **2 hours** after that. After the third failure the delivery is abandoned; every attempt remains visible in Analytics.
+- **Show error to visitor** — the form displays an error message immediately when any delivery fails (the original behavior).
+
+How retries work:
+
+- **Only the endpoints that failed are retried.** With multiple webhooks configured, endpoints that already accepted the submission are never sent a duplicate.
+- **The exact original request is replayed** — same URL (including query parameters), same headers, same JSON body — even if the webhook settings change between the submission and the retry.
+- **Every attempt is logged.** Retry attempts appear as their own Analytics entries with the attempt number appended to the webhook label, e.g. `CRM (retry 2/3)`, making them easy to correlate with the original failed entry.
+- **Scope: Elementor submissions only.** Submissions sent through the [`fwi_submission` action hook](#public-action-hook) or [`fwi_submit_form()`](#result-aware-helper-function) are never retried automatically — those callers receive the real result and are expected to handle failures themselves.
+- **Pre-dispatch rejections are never retried.** A submission blocked by the **Block Submissions Outside US** setting (or one that never dispatched because the integration is inactive, the form is excluded, or no URL is configured) still shows an error even in retry mode — there is nothing to retry.
+- **Timing is a floor, not a guarantee.** Retries run on WP-Cron, which fires on page traffic. On a low-traffic site a retry executes on the first page load after its scheduled time has passed.
+- **Deactivating the plugin discards pending retries.** Their earlier attempts remain in the log; nothing is rescheduled on reactivation.
+
+---
+
 ## Public Action Hook
 
 Any WordPress code — including third-party form plugins — can trigger the webhook without depending on Elementor:
@@ -190,7 +210,7 @@ if (!$result->ok) {
 | `$urlQuery` | `array<string, mixed>` | Optional extra query parameters for this call only. |
 | `$requestHeaders` | `array<string, string>` | Optional extra headers for this call only. |
 
-**Return value:** `WebhookResponse` — a read-only object with four properties:
+**Return value:** `WebhookResponse` — a read-only object with five properties:
 
 | Property | Type | Description |
 |---|---|---|
@@ -198,8 +218,11 @@ if (!$result->ok) {
 | `status` | `int` | HTTP status code returned by the webhook endpoint. `0` when no HTTP response was received (early exits, transport-level errors). |
 | `msg` | `string` | User-facing error description when `ok` is `false`; empty string on success. |
 | `data` | `mixed` | The webhook's response body when an HTTP response was received. JSON-decoded if the body is valid JSON, raw string otherwise. `null` for early exits (inactive integration, excluded form, missing URL, etc.) and transport-level errors. Not intended for public display. |
+| `failedDeliveries` | `array` | One entry per endpoint whose dispatch failed, each an array with `url`, `headers`, `body`, and `label` keys describing the exact request that was sent. Always empty for early exits where nothing was dispatched. The Elementor bridge uses this to queue [background retries](#failure-handling--background-retries); external callers may use it to implement their own retry logic. |
 
 Properties are readonly and cannot be modified after the object is created.
+
+> **Note:** [Background retries](#failure-handling--background-retries) apply only to Elementor form submissions. `fwi_submit_form()` and the action hook always return the real result immediately and never queue retries.
 
 If the webhook integration is disabled in settings, `fwi_submit_form()` returns a `WebhookResponse` with `ok: false`, `msg: 'The webhook integration is not active.'`, and `data: null` immediately without sending any request.
 
@@ -220,6 +243,8 @@ Each accordion shows its entries newest-first. Per-entry data includes:
 - The raw response body received
 
 When multiple webhook endpoints are configured, each endpoint generates its **own separate log entry** per form submission, making it easy to see which endpoint succeeded or failed independently.
+
+[Background retry](#failure-handling--background-retries) attempts also appear as their own entries, labelled with the attempt number appended to the webhook label (e.g. `CRM (retry 2/3)`), so a failed delivery and its subsequent retries can be traced together by label and timestamp.
 
 ### Filtering and Pagination
 
@@ -372,6 +397,7 @@ forms-webhook-integrator/
     ├── Updates/
     │   └── GitHubUpdater.php      # GitHub release checking and WordPress update integration
     └── Webhook/
+        ├── RetryManager.php       # Schedules and executes background retries for failed deliveries
         ├── WebhookHandler.php     # Builds payload, performs IP lookup, POSTs to webhook
         ├── WebhookLogger.php      # Inserts and retrieves log rows from the custom DB table
         ├── WebhookResponse.php    # Readonly value object returned by handleFormSubmission()
@@ -399,6 +425,12 @@ The plugin creates a single custom table — `{prefix}FWI_webhook_logs` — on a
 ---
 
 ## Changelog
+
+### 2.1.0
+- **Webhook Failure Mode setting** — a new option in Webhook Settings controlling what happens when a delivery fails for an Elementor form submission: **Retry in background** (default) shows the visitor a normal success state and retries the failed delivery automatically, or **Show error to visitor** keeps the previous behavior of surfacing the error on the form.
+- **Background retries** — failed deliveries are retried up to 2 more times, roughly 2 hours apart, via WP-Cron. Only the endpoints that failed are retried, and the exact original request (URL, headers, body) is replayed. Retry attempts are logged in Analytics with a `(retry 2/3)` / `(retry 3/3)` label suffix. Pending retries are discarded on plugin deactivation.
+- **`WebhookResponse::$failedDeliveries`** — new readonly property listing the exact request for each endpoint whose dispatch failed, enabling external callers of `fwi_submit_form()` to implement their own retry logic. Backward compatible; existing callers are unaffected.
+- **Scope** — background retries apply to Elementor form submissions only; the `fwi_submission` action hook and `fwi_submit_form()` behave exactly as before. Submissions rejected before dispatch (e.g. by the outside-US block) always show an error and are never retried.
 
 ### 2.0.0
 - **Multi-webhook support** — configure any number of webhook endpoints under a single settings page. Each additional URL is added via the **+ Add Additional URL** button; additional blocks can be removed individually.

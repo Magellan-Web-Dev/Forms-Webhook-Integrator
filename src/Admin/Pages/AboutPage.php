@@ -16,7 +16,7 @@ final class AboutPage
             <div class="fwi-about-intro fwi-card">
                 <p>
                     <strong>Forms Webhook Integrator</strong> forwards form submissions — from Elementor Pro or any WordPress code — to one or more configurable webhook endpoints as a structured JSON payload.
-                    It includes an admin settings UI, per-request analytics logging with per-endpoint filtering, a read-only REST API, and automatic updates from GitHub releases.
+                    It includes an admin settings UI, automatic background retries for failed deliveries, per-request analytics logging with per-endpoint filtering, a read-only REST API, and automatic updates from GitHub releases.
                 </p>
                 <ul class="fwi-about-requirements">
                     <li><span class="fwi-about-label">PHP</span> 8.1+</li>
@@ -36,6 +36,7 @@ final class AboutPage
                         <tr><td>Webhook Endpoints</td><td>One or more webhook URLs the plugin POSTs JSON to on every form submission. Each block has its own URL field, optional label, and <em>Test Webhook</em> button. Use <strong>+ Add Additional URL</strong> to add a second or subsequent endpoint; each additional block has a <strong>Remove</strong> button. When multiple endpoints are configured, the submission is sent to <em>all</em> of them in sequence.</td></tr>
                         <tr><td>Webhook Label</td><td>An optional human-readable name for each endpoint (e.g. <em>CRM</em>, <em>Slack</em>). Labels appear as coloured badges on Analytics log entries and power the per-webhook filter dropdown on the Analytics page.</td></tr>
                         <tr><td>Test Webhook</td><td>Each webhook block has its own <em>Test Webhook</em> button. It sends a lightweight test payload (<code>{"msg":"Webhook submission test"}</code>) to the URL currently typed in that block and shows the HTTP response code inline. The result is persisted and shown on subsequent page loads for that specific endpoint.</td></tr>
+                        <tr><td>Webhook Failure Mode</td><td>What happens when a webhook delivery fails for an <em>Elementor form</em> submission. <strong>Retry in background</strong> (default): the visitor still sees a successful submission and each failed delivery is retried automatically up to 2 more times, roughly 2 hours apart — only the endpoints that failed are retried, replaying the exact original request, and every attempt is logged in Analytics with a <code>(retry 2/3)</code> label suffix. After the third failed attempt the delivery is abandoned (all attempts remain in the log). <strong>Show error to visitor</strong>: the form displays an error message immediately. Submissions blocked by the outside-US setting always show an error and are never retried. Does not apply to the action hook or <code>fwi_submit_form()</code>. Retries run on WP-Cron, so on a low-traffic site the 2-hour delay is a floor rather than an exact time; deactivating the plugin discards pending retries.</td></tr>
                         <tr><td>Global Headers</td><td>Key/value HTTP headers included on every request to every endpoint, merged after <code>Content-Type: application/json</code>.</td></tr>
                         <tr><td>Global URL Query Parameters</td><td>Key/value pairs appended as a query string to the webhook URL on every request.</td></tr>
                         <tr><td>Include Page URL Parameters</td><td>When enabled, any query parameters in the URL of the page where the form was submitted (e.g. <code>?utm_source=google</code>) are automatically appended to the webhook URL for every form submission. Can also be toggled per-form in the <em>Specific Form</em> section. Page params are merged after global params but before per-form params, so per-form values take the highest precedence.</td></tr>
@@ -179,10 +180,14 @@ if ( ! $result->ok ) {
                         <tr><td><code>status</code></td><td><code>int</code></td><td>HTTP status code returned by the webhook endpoint. <code>0</code> when no HTTP response was received (early exits, transport-level errors).</td></tr>
                         <tr><td><code>msg</code></td><td><code>string</code></td><td>User-facing error description when <code>ok</code> is <code>false</code>; empty string on success.</td></tr>
                         <tr><td><code>data</code></td><td><code>mixed</code></td><td>The webhook's response body when an HTTP response was received — JSON-decoded if valid JSON, raw string otherwise. <code>null</code> for early exits and transport-level errors. Not intended for public display.</td></tr>
+                        <tr><td><code>failedDeliveries</code></td><td><code>array</code></td><td>One entry per endpoint whose dispatch failed, each with <code>url</code>, <code>headers</code>, <code>body</code>, and <code>label</code> keys describing the exact request that was sent. Always empty for early exits where nothing was dispatched. Callers may use it to implement their own retry logic.</td></tr>
                     </tbody>
                 </table>
                 <div class="fwi-about-note">
                     If the webhook integration is disabled in settings, <code>fwi_submit_form()</code> returns immediately with <code>ok: false</code>, <code>msg</code> set to an error description, and <code>data: null</code> — no request is sent.
+                </div>
+                <div class="fwi-about-note">
+                    <strong>Note:</strong> the background retries provided by the <em>Webhook Failure Mode</em> setting apply only to Elementor form submissions. <code>fwi_submit_form()</code> and the <code>fwi_submission</code> action hook always return the real result immediately and never queue retries.
                 </div>
             </div>
 
@@ -194,6 +199,7 @@ if ( ! $result->ok ) {
                     <li>Accordion sections for <em>Total Requests</em> and <em>Total Errors</em>, each sorted newest-first.</li>
                     <li>Each entry shows the timestamp, form name, HTTP response code, full webhook URL, request payload, and raw response body.</li>
                     <li>When multiple webhook endpoints are configured, each endpoint generates its <strong>own separate log entry</strong> per form submission. Entries for labelled endpoints display a coloured badge showing the webhook label.</li>
+                    <li>Background retry attempts (see the <em>Webhook Failure Mode</em> setting) appear as their own entries, labelled with the attempt number appended to the webhook label — e.g. <em>CRM (retry 2/3)</em> — so a failed delivery and its retries can be traced together by label and timestamp.</li>
                     <li>Filter by <strong>year / month</strong>, by <strong>webhook endpoint</strong> (when more than one labelled endpoint exists), or by free-text search. Paginate at 5 / 10 / 25 / 50 / 100 entries per page.</li>
                     <li><strong>Delete</strong> a single entry via AJAX, <strong>Clear All Logs</strong> after confirmation, or export as <strong>CSV</strong> / <strong>JSON</strong> (both include the webhook label column).</li>
                     <li>A daily WP-Cron event automatically purges entries older than the configured <strong>Log Retention</strong> period (default 3 months).</li>

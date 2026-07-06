@@ -6,6 +6,7 @@ namespace FormsWebhookIntegrator\Forms;
 if (!defined('ABSPATH')) exit;
 
 use FormsWebhookIntegrator\Settings\SettingsManager;
+use FormsWebhookIntegrator\Webhook\RetryManager;
 use FormsWebhookIntegrator\Webhook\WebhookHandler;
 
 /**
@@ -29,10 +30,13 @@ final class ElementorFormsBridge
      *                                       hook registration on the active flag.
      * @param WebhookHandler  $webhookHandler Called directly so its return value
      *                                       can be used for Elementor error reporting.
+     * @param RetryManager    $retryManager  Queues background retries for failed
+     *                                       deliveries when the failure mode is 'retry'.
      */
     public function __construct(
         private readonly SettingsManager $settings,
-        private readonly WebhookHandler $webhookHandler
+        private readonly WebhookHandler $webhookHandler,
+        private readonly RetryManager $retryManager
     ) {}
 
     /**
@@ -104,6 +108,16 @@ final class ElementorFormsBridge
             $urlQuery,
             $reqHeaders
         );
+
+        // Retry mode: suppress the visitor-facing error only when there are
+        // actual failed dispatches to replay. Pre-dispatch rejections (geo-block,
+        // inactive, excluded, no URL) have no failed deliveries and still surface
+        // the error. Keyed off failedDeliveries rather than ok because a partial
+        // multi-endpoint failure whose last endpoint succeeded reports ok=true.
+        if ($this->settings->getFailureMode() === 'retry' && !empty($result->failedDeliveries)) {
+            $this->retryManager->scheduleRetries($result->failedDeliveries);
+            return; // Elementor defaults to success — the visitor sees the normal success state.
+        }
 
         if (!$result->ok) {
             $handler->add_error_message($result->msg);

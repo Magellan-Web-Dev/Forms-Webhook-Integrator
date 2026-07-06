@@ -247,8 +247,9 @@ final class WebhookHandler
 
         // ── Dispatch to each configured webhook endpoint ───────────────────────
 
-        $overallOk    = true;
-        $lastResponse = new WebhookResponse(ok: false, msg: 'No webhook URLs with a configured URL were found.');
+        $overallOk        = true;
+        $lastResponse     = new WebhookResponse(ok: false, msg: 'No webhook URLs with a configured URL were found.');
+        $failedDeliveries = [];
 
         // Each endpoint POST is synchronous and blocks the submission response,
         // so the per-request timeout is filterable for site owners running slow
@@ -288,8 +289,9 @@ final class WebhookHandler
                     webhookLabel: $label
                 );
 
-                $overallOk    = false;
-                $lastResponse = new WebhookResponse(ok: false, msg: 'There was an issue submitting the form data through the webhook.');
+                $overallOk          = false;
+                $lastResponse       = new WebhookResponse(ok: false, msg: 'There was an issue submitting the form data through the webhook.');
+                $failedDeliveries[] = ['url' => $webhookUrl, 'headers' => $headers, 'body' => $jsonData, 'label' => $label];
                 continue;
             }
 
@@ -300,7 +302,8 @@ final class WebhookHandler
 
             if (!$okResponse) {
                 error_log('FWI Webhook response (' . $label . '): ' . $responseBody);
-                $overallOk = false;
+                $overallOk          = false;
+                $failedDeliveries[] = ['url' => $webhookUrl, 'headers' => $headers, 'body' => $jsonData, 'label' => $label];
             }
 
             $this->logger->log(
@@ -323,7 +326,16 @@ final class WebhookHandler
             return new WebhookResponse(ok: true, status: $lastResponse->status, msg: 'Successfully submitted form data through all webhooks.', data: $lastResponse->data);
         }
 
-        return $lastResponse;
+        // ok/status/msg/data mirror $lastResponse (the final endpoint iteration)
+        // for backward compatibility; $failedDeliveries carries the precise
+        // per-endpoint failure data even when the last endpoint succeeded.
+        return new WebhookResponse(
+            ok: $lastResponse->ok,
+            status: $lastResponse->status,
+            msg: $lastResponse->msg,
+            data: $lastResponse->data,
+            failedDeliveries: $failedDeliveries
+        );
     }
 
     /**

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Forms Webhook Integrator
  * Description: Integrates Elementor and other form submissions via an action hook with a configurable webhook endpoint, with admin settings and analytics.
- * Version:     2.0.1
+ * Version:     2.1.0
  * Requires at least: 6.3
  * Requires PHP: 8.1
  * Author:      Chris Paschall
@@ -37,7 +37,7 @@ if (version_compare(PHP_VERSION, '8.1', '<')) {
  */
 } else {
 
-    define('FWI_VERSION', '2.0.1');
+    define('FWI_VERSION', '2.1.0');
     define('FWI_PLUGIN_FILE', __FILE__);
     define('FWI_PLUGIN_DIR', plugin_dir_path(__FILE__));
     define('FWI_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -62,7 +62,10 @@ if (version_compare(PHP_VERSION, '8.1', '<')) {
     });
 
     /**
-     * Plugin deactivation: unschedule the daily cleanup cron event.
+     * Plugin deactivation: unschedule the daily cleanup cron event and discard
+     * any pending webhook retries (both their cron events and stored payloads).
+     * Discarded retries are not restored on reactivation; every attempt they
+     * already made remains visible in the webhook log.
      *
      * The table and its data are intentionally preserved on deactivation so that
      * logs survive a deactivate/reactivate cycle. Data is only removed when the
@@ -70,6 +73,7 @@ if (version_compare(PHP_VERSION, '8.1', '<')) {
      */
     register_deactivation_hook(__FILE__, static function (): void {
         wp_clear_scheduled_hook('FWI_cleanup_old_logs');
+        FormsWebhookIntegrator\Webhook\RetryManager::clearAll();
     });
 
     add_action('plugins_loaded', static function (): void {

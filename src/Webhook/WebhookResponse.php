@@ -26,11 +26,20 @@ final class WebhookResponse
      *                       received — JSON-decoded if the body is valid JSON,
      *                       raw string otherwise. Null for early exits and
      *                       transport-level errors. Not intended for public display.
+     * @param array  $failedDeliveries Exact requests that were dispatched but failed,
+     *                       one entry per failing endpoint, so callers can queue
+     *                       precise retries without re-sending to endpoints that
+     *                       succeeded. Always empty for early exits (inactive
+     *                       integration, geo-block, excluded form, missing URL),
+     *                       where nothing was dispatched and there is nothing to
+     *                       retry. Each entry:
+     *                       array{url: string, headers: array<string,string>, body: string, label: string}
      */
     public function __construct(
         public readonly bool $ok,
         public readonly int $status = 0,
         public readonly string $msg = '',
-        public readonly mixed $data = null
+        public readonly mixed $data = null,
+        public readonly array $failedDeliveries = []
     ) {}
 }

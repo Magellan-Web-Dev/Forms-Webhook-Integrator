@@ -11,6 +11,7 @@ use FormsWebhookIntegrator\Database\DatabaseManager;
 use FormsWebhookIntegrator\Forms\ElementorFormsBridge;
 use FormsWebhookIntegrator\Settings\SettingsManager;
 use FormsWebhookIntegrator\Updates\GitHubUpdater;
+use FormsWebhookIntegrator\Webhook\RetryManager;
 use FormsWebhookIntegrator\Webhook\WebhookHandler;
 use FormsWebhookIntegrator\Webhook\WebhookLogger;
 
@@ -61,6 +62,13 @@ final class Plugin
     private readonly ElementorFormsBridge $elementorFormsBridge;
 
     /**
+     * Schedules and executes background retries for failed webhook deliveries.
+     *
+     * @var RetryManager
+     */
+    private readonly RetryManager $retryManager;
+
+    /**
      * Registers and handles the read-only analytics REST API endpoint.
      *
      * @var AnalyticsApiHandler
@@ -78,7 +86,8 @@ final class Plugin
         $this->settingsManager      = new SettingsManager();
         $this->adminMenu            = new AdminMenu($this->settingsManager);
         $this->webhookHandler       = new WebhookHandler($this->settingsManager);
-        $this->elementorFormsBridge = new ElementorFormsBridge($this->settingsManager, $this->webhookHandler);
+        $this->retryManager         = new RetryManager();
+        $this->elementorFormsBridge = new ElementorFormsBridge($this->settingsManager, $this->webhookHandler, $this->retryManager);
         $this->analyticsApiHandler  = new AnalyticsApiHandler($this->settingsManager, new WebhookLogger());
     }
 
@@ -143,5 +152,9 @@ final class Plugin
         $this->webhookHandler->register();
         $this->elementorFormsBridge->register();
         $this->analyticsApiHandler->register();
+
+        // Registered unconditionally (not gated on the active flag or Elementor
+        // presence) so retries queued before a settings change still complete.
+        $this->retryManager->register();
     }
 }
