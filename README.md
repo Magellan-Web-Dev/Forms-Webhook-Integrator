@@ -146,14 +146,15 @@ HTTP `200`, `201`, `202`, and `204` responses are treated as success. Any other 
 
 The **Webhook Failure Mode** setting controls what an Elementor form visitor experiences when one or more webhook deliveries fail (for example, when an endpoint is temporarily down):
 
-- **Retry in background** (default) — the form shows its normal success state, so visitors never see an error for a temporary outage and are not tempted to re-submit. Each failed delivery is retried automatically: a second attempt roughly **2 hours** after the submission, and — if that also fails — a third and final attempt roughly **2 hours** after that. After the third failure the delivery is abandoned; every attempt remains visible in Analytics.
+- **Retry in background** (default) — the form shows its normal success state, so visitors never see an error for a temporary outage and are not tempted to re-submit. Each failed delivery is retried automatically on a backoff schedule: roughly **5 minutes**, **30 minutes**, **2 hours**, **6 hours**, and finally **16 hours** after the previous attempt — up to 5 retries spanning about 24 hours in total, so short blips recover within minutes while an overnight outage is still covered. After the sixth failed attempt the delivery is abandoned; every attempt remains visible in Analytics.
 - **Show error to visitor** — the form displays an error message immediately when any delivery fails (the original behavior).
 
 How retries work:
 
 - **Only the endpoints that failed are retried.** With multiple webhooks configured, endpoints that already accepted the submission are never sent a duplicate.
 - **The exact original request is replayed** — same URL (including query parameters), same headers, same JSON body — even if the webhook settings change between the submission and the retry.
-- **Every attempt is logged.** Retry attempts appear as their own Analytics entries with the attempt number appended to the webhook label, e.g. `CRM (retry 2/3)`, making them easy to correlate with the original failed entry.
+- **Every attempt is logged.** Retry attempts appear as their own Analytics entries with the attempt number appended to the webhook label, e.g. `CRM (retry 2/6)`, making them easy to correlate with the original failed entry.
+- **The schedule is tunable per site.** The delays are filterable via `fwi_retry_schedule` (an array of seconds before each retry), so an individual site can shorten or stretch the backoff without code changes to the plugin.
 - **Scope: Elementor submissions only.** Submissions sent through the [`fwi_submission` action hook](#public-action-hook) or [`fwi_submit_form()`](#result-aware-helper-function) are never retried automatically — those callers receive the real result and are expected to handle failures themselves.
 - **Pre-dispatch rejections are never retried.** A submission blocked by the **Block Submissions Outside US** setting (or one that never dispatched because the integration is inactive, the form is excluded, or no URL is configured) still shows an error even in retry mode — there is nothing to retry.
 - **Timing is a floor, not a guarantee.** Retries run on WP-Cron, which fires on page traffic. On a low-traffic site a retry executes on the first page load after its scheduled time has passed.
@@ -244,7 +245,7 @@ Each accordion shows its entries newest-first. Per-entry data includes:
 
 When multiple webhook endpoints are configured, each endpoint generates its **own separate log entry** per form submission, making it easy to see which endpoint succeeded or failed independently.
 
-[Background retry](#failure-handling--background-retries) attempts also appear as their own entries, labelled with the attempt number appended to the webhook label (e.g. `CRM (retry 2/3)`), so a failed delivery and its subsequent retries can be traced together by label and timestamp.
+[Background retry](#failure-handling--background-retries) attempts also appear as their own entries, labelled with the attempt number appended to the webhook label (e.g. `CRM (retry 2/6)`), so a failed delivery and its subsequent retries can be traced together by label and timestamp.
 
 ### Filtering and Pagination
 
@@ -425,6 +426,10 @@ The plugin creates a single custom table — `{prefix}FWI_webhook_logs` — on a
 ---
 
 ## Changelog
+
+### 2.2.0
+- **Extended retry backoff schedule** — background retries now make up to 5 attempts after the original send (was 2), on a widening backoff of 5 minutes, 30 minutes, 2 hours, 6 hours, and 16 hours — covering outages up to ~24 hours (was ~4 hours). Analytics labels now read `(retry N/6)`. Retries already pending at upgrade time transition to the new schedule automatically.
+- **`fwi_retry_schedule` filter** — the backoff delays are now filterable per site.
 
 ### 2.1.0
 - **Webhook Failure Mode setting** — a new option in Webhook Settings controlling what happens when a delivery fails for an Elementor form submission: **Retry in background** (default) shows the visitor a normal success state and retries the failed delivery automatically, or **Show error to visitor** keeps the previous behavior of surfacing the error on the form.

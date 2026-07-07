@@ -11,11 +11,13 @@ if (!defined('ABSPATH')) exit;
  * When the failure mode setting is "retry", the ElementorFormsBridge hands the
  * failed deliveries from a submission to scheduleRetries(). Each failed
  * endpoint delivery is stored as its own non-autoloaded option row and a
- * WP-Cron single event is scheduled roughly two hours out. A delivery is
- * attempted at most MAX_ATTEMPTS times in total (the original send plus two
- * retries); after the final failure the row is deleted and the delivery is
- * abandoned — every attempt is already recorded in the webhook log, so nothing
- * is silently lost.
+ * WP-Cron single event is scheduled per RETRY_SCHEDULE — quick retries first
+ * to recover from short blips, then widening gaps to ride out long outages,
+ * spanning roughly 24 hours in total. A delivery is attempted at most
+ * MAX_ATTEMPTS times in total (the original send plus the scheduled retries);
+ * after the final failure the row is deleted and the delivery is abandoned —
+ * every attempt is already recorded in the webhook log, so nothing is
+ * silently lost.
  *
  * The stored request (URL, headers, JSON body) is replayed verbatim so that
  * endpoints receive exactly what was originally dispatched, even if the
@@ -24,8 +26,8 @@ if (!defined('ABSPATH')) exit;
  * any auth headers); they are admin-only wp_options data and are deleted on
  * success, on give-up, and by a daily stale-row sweep.
  *
- * Note: WP-Cron fires on page traffic, so on a low-traffic site the two-hour
- * delay is a floor — the retry runs on the first page load after it is due.
+ * Note: WP-Cron fires on page traffic, so on a low-traffic site each delay
+ * is a floor — the retry runs on the first page load after it is due.
  */
 final class RetryManager
 {
@@ -40,22 +42,26 @@ final class RetryManager
     public const OPTION_PREFIX = 'FWI_retry_';
 
     /**
-     * Total delivery attempts per endpoint: the original send plus two retries.
+     * Total delivery attempts per endpoint: the original send plus one retry
+     * per RETRY_SCHEDULE entry (MAX_ATTEMPTS = 1 + count(RETRY_SCHEDULE)).
      */
-    public const MAX_ATTEMPTS = 3;
+    public const MAX_ATTEMPTS = 6;
 
     /**
-     * Seconds between attempts (two hours).
+     * Backoff delays in seconds before each retry, indexed by attempts already
+     * made (attempt 1 is the original send, so RETRY_SCHEDULE[0] is the delay
+     * before attempt 2). Quick retries first recover fast from short blips;
+     * the widening gaps cover an outage of up to ~24.5 hours in total.
      */
-    public const RETRY_DELAY = 7200;
+    private const RETRY_SCHEDULE = [300, 1800, 7200, 21600, 57600]; // 5m, 30m, 2h, 6h, 16h
 
     /**
      * Age in seconds after which a pending retry row is considered orphaned
      * (its cron events were lost) and removed by the daily sweep. Retries
-     * complete within ~4 hours, so 24 hours is comfortably past any legitimate
-     * pending window.
+     * complete within ~24.5 hours, so 48 hours is comfortably past any
+     * legitimate pending window.
      */
-    private const STALE_AGE = 86400;
+    private const STALE_AGE = 172800;
 
     /**
      * Records each retry attempt and its outcome for display on the analytics page.
@@ -117,8 +123,29 @@ final class RetryManager
                 'created_at' => time(),
             ], '', false);
 
-            $this->scheduleEvent($id);
+            $this->scheduleEvent($id, self::retryDelay(1));
         }
+    }
+
+    /**
+     * Returns the backoff delay in seconds before the next retry.
+     *
+     * The schedule is filterable (fwi_retry_schedule) so individual sites can
+     * tune the delays without code changes. The retry count itself is fixed at
+     * MAX_ATTEMPTS; a filtered schedule shorter than the default reuses its
+     * last delay for any remaining attempts.
+     *
+     * @param int $attemptsMade Delivery attempts already made (>= 1; the
+     *                          original send counts as attempt 1).
+     *
+     * @return int Seconds to wait before the next attempt (minimum 60).
+     */
+    private static function retryDelay(int $attemptsMade): int
+    {
+        $schedule = (array) apply_filters('fwi_retry_schedule', self::RETRY_SCHEDULE);
+        $delay    = $schedule[$attemptsMade - 1] ?? end($schedule);
+
+        return max(60, (int) $delay);
     }
 
     /**
@@ -132,19 +159,20 @@ final class RetryManager
      * the daily {@see purgeStaleRetries()} reconcile sweep.
      *
      * @param string $retryId UUID suffix of the pending retry's option row.
+     * @param int    $delay   Seconds from now to fire the retry.
      *
      * @return void
      */
-    private function scheduleEvent(string $retryId): void
+    private function scheduleEvent(string $retryId, int $delay): void
     {
-        wp_schedule_single_event(time() + self::RETRY_DELAY, self::HOOK, [$retryId]);
+        wp_schedule_single_event(time() + $delay, self::HOOK, [$retryId]);
 
         // Force an uncached re-read of the cron option before verifying.
         wp_cache_delete('cron', 'options');
         wp_cache_delete('alloptions', 'options');
 
         if (wp_next_scheduled(self::HOOK, [$retryId]) === false) {
-            wp_schedule_single_event(time() + self::RETRY_DELAY, self::HOOK, [$retryId]);
+            wp_schedule_single_event(time() + $delay, self::HOOK, [$retryId]);
         }
     }
 
@@ -223,7 +251,7 @@ final class RetryManager
 
         $row['attempts'] = $attempt;
         update_option($optionName, $row, false);
-        $this->scheduleEvent($retryId);
+        $this->scheduleEvent($retryId, self::retryDelay($attempt));
     }
 
     /**
@@ -232,7 +260,7 @@ final class RetryManager
      * WP-Cron's option-based storage has a known lost-update race: a concurrent
      * cron run can rewrite the cron option over a freshly scheduled event. Rows
      * younger than STALE_AGE whose event went missing are re-scheduled; rows
-     * older than STALE_AGE are removed (retries complete within ~4 hours, so
+     * older than STALE_AGE are removed (retries complete within ~24.5 hours, so
      * anything that old is beyond recovery and its attempts are already logged).
      *
      * Safety net only: under normal operation processRetry() deletes each row
@@ -253,7 +281,9 @@ final class RetryManager
 
             $retryId = substr($optionName, strlen(self::OPTION_PREFIX));
             if (wp_next_scheduled(self::HOOK, [$retryId]) === false) {
-                $this->scheduleEvent($retryId);
+                // The lost event was already overdue, so re-run soon rather
+                // than waiting out the row's nominal backoff slot again.
+                $this->scheduleEvent($retryId, self::retryDelay(1));
             }
         }
     }

@@ -217,7 +217,7 @@ final class SettingsPage
                                             value="retry"
                                             <?php checked($failureMode, 'retry'); ?>
                                         >
-                                        <strong>Retry in background</strong> — the visitor sees a successful submission; failed webhook deliveries are retried automatically up to 2 more times, about 2 hours apart.
+                                        <strong>Retry in background</strong> — the visitor sees a successful submission; failed webhook deliveries are retried automatically up to 5 more times over about 24 hours (after 5 minutes, 30 minutes, 2 hours, 6 hours, and 16 hours).
                                     </label>
                                     <label style="display:block;">
                                         <input
