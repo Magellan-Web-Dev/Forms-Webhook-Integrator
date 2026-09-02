@@ -55,7 +55,7 @@ Each webhook block contains:
 |---|---|
 | **Webhook Failure Mode** | What happens when a webhook delivery fails for an **Elementor form** submission. **Retry in background** (default): the visitor still sees a successful submission and the failed delivery is retried automatically in the background. **Show error to visitor**: the form displays an error message immediately. See [Failure Handling & Background Retries](#failure-handling--background-retries). |
 | **Global Headers** | Custom HTTP headers included on every webhook request to every endpoint (e.g. `Authorization: Bearer …`). Added via a key/value builder; any header here is merged after `Content-Type: application/json`. |
-| **Global URL Query Parameters** | Key/value pairs appended as a query string to every webhook URL on every request. Also includes an **Include Page URL Parameters** checkbox — when enabled, any query parameters present in the URL of the page where the form was submitted (e.g. `?utm_source=google&gclid=…`) are automatically appended to the webhook URL on every form submission. |
+| **Global URL Query Parameters** | Key/value pairs appended as a query string to every webhook URL on every request, and also sent in the payload's `custom_parameters` block. Also includes an **Include Page URL Parameters** checkbox — when enabled, any query parameters present in the URL of the page where the form was submitted (e.g. `?utm_source=google&gclid=…`) are automatically appended to the webhook URL on every form submission. |
 | **Client First Name** | Embedded in the `website_info.client` block of every payload. |
 | **Client Last Name** | Embedded in the `website_info.client` block of every payload. |
 | **Client ID** | Optional identifier sent as `website_info.client.id` in every payload. Leave blank if not needed. |
@@ -73,7 +73,7 @@ Per-form overrides for URL query parameters and request headers. Each active (no
 
 - **Form ID** — an optional identifier sent as `form_id` directly alongside `form_name` in the webhook payload for that form's submissions only.
 - **Include Page URL Parameters** — a checkbox that enables page URL parameter passthrough for this form only, regardless of the global setting. When enabled, query parameters from the page URL are appended to the webhook URL for that form's submissions.
-- **URL Query Parameters** — appended on top of the global query parameters for that form's requests only.
+- **URL Query Parameters** — appended on top of the global query parameters for that form's requests only. Also sent in the payload's `custom_parameters` block, where they override any global parameter of the same name.
 - **Request Headers** — merged after the global headers for that form's requests only.
 
 Per-form settings are preserved in the database even while a form is excluded, so the configuration is restored automatically when the form is re-enabled.
@@ -113,6 +113,10 @@ Every webhook POST sends `Content-Type: application/json` with the following bod
   },
   "form_name": "Contact Form",
   "form_id": "contact-form-01",
+  "custom_parameters": {
+    "source": "microsite",
+    "campaign": "spring"
+  },
   "submission_data": {
     "name": "John Doe",
     "email": "john@example.com",
@@ -136,7 +140,7 @@ Every webhook POST sends `Content-Type: application/json` with the following bod
 }
 ```
 
-`submission_data` keys are the Elementor field IDs; values are sanitised strings. `website_info.id` is the optional identifier configured in Webhook Settings (empty string when not set). `website_info.client.id` is the optional client identifier configured in Webhook Settings (empty string when not set). `website_info.page.url` is the clean URL of the page the form was submitted from (no query string), and `website_info.page.query` is an associative array of any URL parameters that were present on that page — both derived from the HTTP referrer. `form_id` is an optional per-form identifier configured in the Specific Form URL Query And Headers section (empty string when not set). `client_location_data` is populated via a live lookup to [ipapi.co](https://ipapi.co). If the IP cannot be resolved, the block contains an `"error"` key instead of location fields.
+`submission_data` keys are the Elementor field IDs; values are sanitised strings. `website_info.id` is the optional identifier configured in Webhook Settings (empty string when not set). `website_info.client.id` is the optional client identifier configured in Webhook Settings (empty string when not set). `website_info.page.url` is the clean URL of the page the form was submitted from (no query string), and `website_info.page.query` is an associative array of any URL parameters that were present on that page — both derived from the HTTP referrer. `form_id` is an optional per-form identifier configured in the Specific Form URL Query And Headers section (empty string when not set). `custom_parameters` is an associative array of the configured URL query parameters — the global query parameters merged with that form's per-form query parameters, where a per-form key overrides the same global key. It is always present (an empty array when none are configured). Parameters from the page URL are **not** included there; they are reported in `website_info.page.query`. `client_location_data` is populated via a live lookup to [ipapi.co](https://ipapi.co). If the IP cannot be resolved, the block contains an `"error"` key instead of location fields.
 
 HTTP `200`, `201`, `202`, and `204` responses are treated as success. Any other status code, or a transport-level error, is recorded as a failure.
 
@@ -426,6 +430,12 @@ The plugin creates a single custom table — `{prefix}FWI_webhook_logs` — on a
 ---
 
 ## Changelog
+
+### 2.3.0
+- **`custom_parameters` in the payload** — the configured URL query parameters are now always sent in the JSON body as a new top-level `custom_parameters` key, alongside `website_info`, `form_name`, and `form_id`. It holds the global query parameters merged with the submitting form's per-form query parameters, where a per-form key overrides the same global key — matching the precedence already used when building the webhook URL. The key is always present, as an empty array when nothing is configured.
+- **Page URL parameters are not duplicated** — parameters picked up from the submitting page's URL continue to be reported in `website_info.page.query` only, and never appear in `custom_parameters`.
+- **Log redaction extended** — sensitive parameter names (`api_key`, `token`, `secret`, …) are now redacted from `custom_parameters` in the Analytics log, matching the existing redaction of the logged webhook URL. The receiving endpoint still gets the real values.
+- **Backward compatible** — the webhook URL is built exactly as before, and existing payload keys are unchanged; consumers that ignore unknown keys are unaffected.
 
 ### 2.2.0
 - **Extended retry backoff schedule** — background retries now make up to 5 attempts after the original send (was 2), on a widening backoff of 5 minutes, 30 minutes, 2 hours, 6 hours, and 16 hours — covering outages up to ~24 hours (was ~4 hours). Analytics labels now read `(retry N/6)`. Retries already pending at upgrade time transition to the new schedule automatically.

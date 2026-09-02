@@ -281,7 +281,14 @@ final class WebhookLogger
     }
 
     /**
-     * Replaces values of known-sensitive field names in submission_data with [REDACTED].
+     * Replaces values of known-sensitive field names with [REDACTED] in every
+     * payload block that can carry admin- or visitor-supplied values.
+     *
+     * custom_parameters is covered alongside submission_data because a configured
+     * query parameter may itself be a credential (e.g. api_key). Such values are
+     * already redacted in the logged URL by redactSensitiveUrl(), so leaving the
+     * payload copy in the clear would defeat that. Only the persisted log row is
+     * affected — the outbound webhook still receives the real values.
      *
      * @param array<string, mixed> $requestData
      *
@@ -289,16 +296,18 @@ final class WebhookLogger
      */
     private function redactSensitiveFields(array $requestData): array
     {
-        if (!isset($requestData['submission_data']) || !is_array($requestData['submission_data'])) {
-            return $requestData;
-        }
+        foreach (['submission_data', 'custom_parameters'] as $block) {
+            if (!isset($requestData[$block]) || !is_array($requestData[$block])) {
+                continue;
+            }
 
-        foreach (array_keys($requestData['submission_data']) as $key) {
-            $lower = strtolower((string) $key);
-            foreach (self::SENSITIVE_FIELD_PATTERNS as $pattern) {
-                if (str_contains($lower, $pattern)) {
-                    $requestData['submission_data'][$key] = '[REDACTED]';
-                    break;
+            foreach (array_keys($requestData[$block]) as $key) {
+                $lower = strtolower((string) $key);
+                foreach (self::SENSITIVE_FIELD_PATTERNS as $pattern) {
+                    if (str_contains($lower, $pattern)) {
+                        $requestData[$block][$key] = '[REDACTED]';
+                        break;
+                    }
                 }
             }
         }

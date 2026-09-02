@@ -139,9 +139,13 @@ final class WebhookHandler
         ];
 
         // Add form name and identifier — settings override wins; caller-supplied form_id is the fallback
+        $formOverride          = $this->settings->getFormOverride($formName);
         $formData['form_name'] = $formName;
-        $settingsFormId        = $this->settings->getFormOverride($formName)['form_id'];
+        $settingsFormId        = $formOverride['form_id'];
         $formData['form_id']   = $settingsFormId !== '' ? $settingsFormId : $passedFormId;
+
+        // Mirror the admin-configured URL query parameters into the payload
+        $formData['custom_parameters'] = $this->buildCustomParameters($formOverride);
 
         // Sanitize and store submission fields, preserving array structure for
         // multi-value fields such as checkbox groups.
@@ -380,5 +384,35 @@ final class WebhookHandler
             'url'   => esc_url_raw($pageUrl),
             'query' => $query,
         ];
+    }
+
+    /**
+     * Merges the global and per-form URL query parameters into a flat map for
+     * the payload's custom_parameters key.
+     *
+     * Global params are applied first so per-form params take precedence, matching
+     * the order in which they are appended to the webhook URL. Page-URL passthrough
+     * params are intentionally excluded — they are reported in website_info.page.query.
+     *
+     * @param array{query_params: array<int, array{key: string, value: string}>} $formOverride
+     *                            A single form's overrides, as returned by
+     *                            SettingsManager::getFormOverride().
+     *
+     * @return array<string, string> Sanitised key-value pairs, or empty array.
+     */
+    private function buildCustomParameters(array $formOverride): array
+    {
+        $rows = array_merge($this->settings->getQueryParams(), $formOverride['query_params']);
+
+        $params = [];
+        foreach ($rows as $row) {
+            $key = sanitize_text_field((string) ($row['key'] ?? ''));
+            if ($key === '') {
+                continue;
+            }
+            $params[$key] = sanitize_text_field((string) ($row['value'] ?? ''));
+        }
+
+        return $params;
     }
 }

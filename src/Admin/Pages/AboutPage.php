@@ -38,14 +38,14 @@ final class AboutPage
                         <tr><td>Test Webhook</td><td>Each webhook block has its own <em>Test Webhook</em> button. It sends a lightweight test payload (<code>{"msg":"Webhook submission test"}</code>) to the URL currently typed in that block and shows the HTTP response code inline. The result is persisted and shown on subsequent page loads for that specific endpoint.</td></tr>
                         <tr><td>Webhook Failure Mode</td><td>What happens when a webhook delivery fails for an <em>Elementor form</em> submission. <strong>Retry in background</strong> (default): the visitor still sees a successful submission and each failed delivery is retried automatically up to 5 more times on a backoff schedule spanning about 24 hours (5 minutes, 30 minutes, 2 hours, 6 hours, then 16 hours after the previous attempt) — only the endpoints that failed are retried, replaying the exact original request, and every attempt is logged in Analytics with a <code>(retry 2/6)</code> label suffix. After the sixth failed attempt the delivery is abandoned (all attempts remain in the log). <strong>Show error to visitor</strong>: the form displays an error message immediately. Submissions blocked by the outside-US setting always show an error and are never retried. Does not apply to the action hook or <code>fwi_submit_form()</code>. Retries run on WP-Cron, so on a low-traffic site each delay is a floor rather than an exact time; deactivating the plugin discards pending retries.</td></tr>
                         <tr><td>Global Headers</td><td>Key/value HTTP headers included on every request to every endpoint, merged after <code>Content-Type: application/json</code>.</td></tr>
-                        <tr><td>Global URL Query Parameters</td><td>Key/value pairs appended as a query string to the webhook URL on every request.</td></tr>
+                        <tr><td>Global URL Query Parameters</td><td>Key/value pairs appended as a query string to the webhook URL on every request. Also sent in the payload's <code>custom_parameters</code> block.</td></tr>
                         <tr><td>Include Page URL Parameters</td><td>When enabled, any query parameters in the URL of the page where the form was submitted (e.g. <code>?utm_source=google</code>) are automatically appended to the webhook URL for every form submission. Can also be toggled per-form in the <em>Specific Form</em> section. Page params are merged after global params but before per-form params, so per-form values take the highest precedence.</td></tr>
                         <tr><td>Client First / Last Name</td><td>Embedded in the <code>website_info.client</code> block of every payload.</td></tr>
                         <tr><td>Client ID</td><td>Optional identifier sent as <code>website_info.client.id</code> in every payload. Leave blank if not needed.</td></tr>
                         <tr><td>Website ID</td><td>Optional identifier sent as <code>website_info.id</code> in every payload.</td></tr>
                         <tr><td>Block Outside US</td><td>Rejects submissions whose sender IP resolves to a non-US country before the webhook fires. Defaults to <em>Yes</em>.</td></tr>
                         <tr><td>Excluded Forms</td><td>Elementor form names that should never trigger the webhook. Per-form settings are preserved even while a form is excluded.</td></tr>
-                        <tr><td>Per-Form Overrides</td><td>Per-form settings that are merged on top of the global values for that form only: an optional <em>Form ID</em> (sent as <code>form_id</code> in the payload), an <em>Include Page URL Parameters</em> checkbox, additional URL query parameters, and additional request headers.</td></tr>
+                        <tr><td>Per-Form Overrides</td><td>Per-form settings that are merged on top of the global values for that form only: an optional <em>Form ID</em> (sent as <code>form_id</code> in the payload), an <em>Include Page URL Parameters</em> checkbox, additional URL query parameters (also sent in the payload's <code>custom_parameters</code> block, where they override any global parameter of the same name), and additional request headers.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -67,6 +67,10 @@ final class AboutPage
   },
   "form_name": "Contact Form",
   "form_id": "contact-form-01",
+  "custom_parameters": {
+    "source": "microsite",
+    "campaign": "spring"
+  },
   "submission_data": {
     "name": "John Doe",
     "email": "john@example.com",
@@ -92,6 +96,7 @@ final class AboutPage
                     <code>website_info.page.url</code> is the clean URL of the page the form was submitted from (no query string);
                     <code>website_info.page.query</code> is an associative array of any URL parameters that were present on that page — both derived from the HTTP referrer.
                     <code>form_id</code> is an optional per-form identifier configured in the <em>Specific Form URL Query And Headers</em> section; it is always present (empty string when not set).
+                    <code>custom_parameters</code> is an associative array of the configured URL query parameters — the <em>Global URL Query Parameters</em> merged with that form's <em>URL Query Parameters</em>, where a per-form key overrides the same global key. It is always present (an empty array when none are configured). Parameters from the page URL are <strong>not</strong> included here; they are reported in <code>website_info.page.query</code>.
                     <code>client_location_data</code> is populated via a live lookup to <strong>ipapi.co</strong>.
                     If the IP cannot be resolved the block contains an <code>"error"</code> key instead.
                     HTTP <code>200</code>, <code>201</code>, <code>202</code>, and <code>204</code> are treated as success.
