@@ -15,14 +15,63 @@ final class AboutPage
 
             <div class="fwi-about-intro fwi-card">
                 <p>
-                    <strong>Forms Webhook Integrator</strong> forwards form submissions — from Elementor Pro or any WordPress code — to one or more configurable webhook endpoints as a structured JSON payload.
+                    <strong>Forms Webhook Integrator</strong> forwards form submissions — from Elementor Pro classic forms, Elementor Pro Atomic forms, or any WordPress code — to one or more configurable webhook endpoints as a structured JSON payload.
                     It includes an admin settings UI, automatic background retries for failed deliveries, per-request analytics logging with per-endpoint filtering, a read-only REST API, and automatic updates from GitHub releases.
                 </p>
                 <ul class="fwi-about-requirements">
                     <li><span class="fwi-about-label">PHP</span> 8.1+</li>
                     <li><span class="fwi-about-label">WordPress</span> 6.3+</li>
-                    <li><span class="fwi-about-label">Elementor Pro</span> Optional — required only for the built-in Elementor bridge; all other forms use the public action hook.</li>
+                    <li><span class="fwi-about-label">Elementor Pro</span> Optional — required only for the built-in Elementor bridges (classic and Atomic); all other forms use the public action hook.</li>
                 </ul>
+            </div>
+
+            <!-- Elementor Forms: Classic and Atomic -->
+            <div class="fwi-card">
+                <h2 class="fwi-card-title">Elementor Forms — Classic and Atomic</h2>
+                <p>
+                    Elementor Pro ships two different form systems and this plugin supports both.
+                    They differ only in how a submission reaches the plugin; everything after that point is identical.
+                </p>
+                <table class="fwi-about-table">
+                    <thead><tr><th>Form type</th><th>How it connects</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Classic Elementor form</strong><br><span class="description">the <em>Form</em> widget</span></td>
+                            <td><strong>Captured automatically.</strong> Nothing to configure — every submission is forwarded as soon as the webhook is active, through Elementor's <code>elementor_pro/forms/new_record</code> hook.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Atomic form</strong><br><span class="description">the <em>Atomic form</em> element (<code>e-form</code>)</span></td>
+                            <td><strong>Opt in per form.</strong> In the Elementor editor, select the Atomic form element and add <strong>Forms Webhook Integrator</strong> under <em>Actions after submit</em>. Atomic forms run an explicit list of actions on submit, so nothing is sent until that action is selected.</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p style="margin-top:16px;">
+                    Once connected, Atomic submissions run through exactly the same pipeline as classic ones: the same webhook endpoints, the same JSON payload,
+                    the same Analytics logging, the same <em>Excluded Forms</em> list, the same per-form Form ID / URL query parameter / request header / page-parameter
+                    overrides, and the same <em>Webhook Failure Mode</em> retry policy. Atomic forms appear in the <em>Excluded Forms</em> dropdown and the
+                    <em>Specific Form URL Query And Headers</em> section under their configured <em>Form name</em>.
+                </p>
+                <div class="fwi-about-note">
+                    <strong>Elementor's native "Webhook" action is separate and is not required.</strong> That is Elementor Pro's own action, which POSTs a flat body to a URL typed into the form itself.
+                    Leave it unselected — selecting <em>Forms Webhook Integrator</em> is all this integration needs. If you do select both, each sends its own independent request: Elementor's to its own URL,
+                    this plugin's to the endpoints configured in Webhook Settings. <em>Email</em> and <em>Collect submissions</em> also continue to work normally alongside it.
+                </div>
+                <div class="fwi-about-note">
+                    <strong>Atomic field names.</strong> Atomic field IDs are opaque element IDs, so <code>submission_data</code> keys use each field's editor <em>label</em> where Elementor supplies one,
+                    falling back to the raw field ID. Two fields sharing a label are disambiguated with an ID suffix (e.g. <code>Name_e1a2b3c</code>) rather than overwriting one another.
+                    Multi-value fields — checkbox groups, multi-selects, and uploaded-file URL lists — are sent as JSON arrays.
+                </div>
+                <div class="fwi-about-note">
+                    <strong>Requires Elementor Pro's Atomic Form module</strong> (verified against Elementor and Elementor Pro 4.2.3). When Elementor Pro or its Atomic Form module is unavailable the Atomic
+                    integration simply stays dormant — classic forms and the action hook are unaffected. If a form already has this action saved and the webhook is later switched to <em>Inactive</em>,
+                    the action reports a successful no-op so the visitor's submission never fails.
+                </div>
+                <div class="fwi-about-note">
+                    <strong>Visitor-facing errors on Atomic forms.</strong> With <em>Show error to visitor</em> this action returns a failed result to Elementor, which records it in the action results and in the
+                    Submissions action log. Note that Elementor Pro 4.2.3 only switches an Atomic form into its error state for actions that fail through its own internal failure path, so a returned failure —
+                    from this action or from Elementor's own native Webhook action — does not by itself show the visitor an error. The failure is always recorded in Analytics.
+                    <em>Retry in background</em> (the default) is unaffected: failed deliveries are queued and replayed exactly as they are for classic forms.
+                </div>
             </div>
 
             <!-- Settings -->
@@ -36,7 +85,7 @@ final class AboutPage
                         <tr><td>Webhook Endpoints</td><td>One or more webhook URLs the plugin POSTs JSON to on every form submission. Each block has its own URL field, optional label, and <em>Test Webhook</em> button. Use <strong>+ Add Additional URL</strong> to add a second or subsequent endpoint; each additional block has a <strong>Remove</strong> button. When multiple endpoints are configured, the submission is sent to <em>all</em> of them in sequence.</td></tr>
                         <tr><td>Webhook Label</td><td>An optional human-readable name for each endpoint (e.g. <em>CRM</em>, <em>Slack</em>). Labels appear as coloured badges on Analytics log entries and power the per-webhook filter dropdown on the Analytics page.</td></tr>
                         <tr><td>Test Webhook</td><td>Each webhook block has its own <em>Test Webhook</em> button. It sends a lightweight test payload (<code>{"msg":"Webhook submission test"}</code>) to the URL currently typed in that block and shows the HTTP response code inline. The result is persisted and shown on subsequent page loads for that specific endpoint.</td></tr>
-                        <tr><td>Webhook Failure Mode</td><td>What happens when a webhook delivery fails for an <em>Elementor form</em> submission. <strong>Retry in background</strong> (default): the visitor still sees a successful submission and each failed delivery is retried automatically up to 5 more times on a backoff schedule spanning about 24 hours (5 minutes, 30 minutes, 2 hours, 6 hours, then 16 hours after the previous attempt) — only the endpoints that failed are retried, replaying the exact original request, and every attempt is logged in Analytics with a <code>(retry 2/6)</code> label suffix. After the sixth failed attempt the delivery is abandoned (all attempts remain in the log). <strong>Show error to visitor</strong>: the form displays an error message immediately. Submissions blocked by the outside-US setting always show an error and are never retried. Does not apply to the action hook or <code>fwi_submit_form()</code>. Retries run on WP-Cron, so on a low-traffic site each delay is a floor rather than an exact time; deactivating the plugin discards pending retries.</td></tr>
+                        <tr><td>Webhook Failure Mode</td><td>What happens when a webhook delivery fails for an <em>Elementor form</em> submission — classic or Atomic. <strong>Retry in background</strong> (default): the visitor still sees a successful submission and each failed delivery is retried automatically up to 5 more times on a backoff schedule spanning about 24 hours (5 minutes, 30 minutes, 2 hours, 6 hours, then 16 hours after the previous attempt) — only the endpoints that failed are retried, replaying the exact original request, and every attempt is logged in Analytics with a <code>(retry 2/6)</code> label suffix. After the sixth failed attempt the delivery is abandoned (all attempts remain in the log). <strong>Show error to visitor</strong>: the form displays an error message immediately. Submissions blocked by the outside-US setting always show an error and are never retried. Does not apply to the action hook or <code>fwi_submit_form()</code>. Retries run on WP-Cron, so on a low-traffic site each delay is a floor rather than an exact time; deactivating the plugin discards pending retries.</td></tr>
                         <tr><td>Global Headers</td><td>Key/value HTTP headers included on every request to every endpoint, merged after <code>Content-Type: application/json</code>.</td></tr>
                         <tr><td>Global URL Query Parameters</td><td>Key/value pairs appended as a query string to the webhook URL on every request. Also sent in the payload's <code>custom_parameters</code> block.</td></tr>
                         <tr><td>Include Page URL Parameters</td><td>When enabled, any query parameters in the URL of the page where the form was submitted (e.g. <code>?utm_source=google</code>) are automatically appended to the webhook URL for every form submission. Can also be toggled per-form in the <em>Specific Form</em> section. Page params are merged after global params but before per-form params, so per-form values take the highest precedence.</td></tr>
@@ -44,8 +93,8 @@ final class AboutPage
                         <tr><td>Client ID</td><td>Optional identifier sent as <code>website_info.client.id</code> in every payload. Leave blank if not needed.</td></tr>
                         <tr><td>Website ID</td><td>Optional identifier sent as <code>website_info.id</code> in every payload.</td></tr>
                         <tr><td>Block Outside US</td><td>Rejects submissions whose sender IP resolves to a non-US country before the webhook fires. Defaults to <em>Yes</em>.</td></tr>
-                        <tr><td>Excluded Forms</td><td>Elementor form names that should never trigger the webhook. Per-form settings are preserved even while a form is excluded.</td></tr>
-                        <tr><td>Per-Form Overrides</td><td>Per-form settings that are merged on top of the global values for that form only: an optional <em>Form ID</em> (sent as <code>form_id</code> in the payload), an <em>Include Page URL Parameters</em> checkbox, additional URL query parameters (also sent in the payload's <code>custom_parameters</code> block, where they override any global parameter of the same name), and additional request headers.</td></tr>
+                        <tr><td>Excluded Forms</td><td>Elementor form names that should never trigger the webhook. Both classic form widgets and Atomic form elements are discovered and listed. Per-form settings are preserved even while a form is excluded. An excluded Atomic form sends nothing and still reports success to Elementor, so the visitor's submission is not failed.</td></tr>
+                        <tr><td>Per-Form Overrides</td><td>Per-form settings — available to classic and Atomic forms alike — that are merged on top of the global values for that form only: an optional <em>Form ID</em> (sent as <code>form_id</code> in the payload), an <em>Include Page URL Parameters</em> checkbox, additional URL query parameters (also sent in the payload's <code>custom_parameters</code> block, where they override any global parameter of the same name), and additional request headers.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -90,7 +139,7 @@ final class AboutPage
   "timestamp": { "date": "2025-04-15", "time": "14:32:00" }
 }</pre>
                 <p>
-                    <code>submission_data</code> keys are the form field IDs; values are sanitised strings.
+                    <code>submission_data</code> keys are the form field IDs for classic Elementor forms and other integrations, and the field labels (falling back to field IDs) for Atomic forms; values are sanitised strings, or arrays of sanitised strings for multi-value fields.
                     <code>website_info.id</code> is an optional identifier configured in Webhook Settings; it is always present in the payload (empty string when not set).
                     <code>website_info.client.id</code> is an optional client identifier configured in Webhook Settings; it is always present in the payload (empty string when not set).
                     <code>website_info.page.url</code> is the clean URL of the page the form was submitted from (no query string);
@@ -192,7 +241,7 @@ if ( ! $result->ok ) {
                     If the webhook integration is disabled in settings, <code>fwi_submit_form()</code> returns immediately with <code>ok: false</code>, <code>msg</code> set to an error description, and <code>data: null</code> — no request is sent.
                 </div>
                 <div class="fwi-about-note">
-                    <strong>Note:</strong> the background retries provided by the <em>Webhook Failure Mode</em> setting apply only to Elementor form submissions. <code>fwi_submit_form()</code> and the <code>fwi_submission</code> action hook always return the real result immediately and never queue retries.
+                    <strong>Note:</strong> the background retries provided by the <em>Webhook Failure Mode</em> setting apply only to Elementor form submissions (classic and Atomic). <code>fwi_submit_form()</code> and the <code>fwi_submission</code> action hook always return the real result immediately and never queue retries.
                 </div>
             </div>
 

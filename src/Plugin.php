@@ -8,6 +8,7 @@ if (!defined('ABSPATH')) exit;
 use FormsWebhookIntegrator\Admin\AdminMenu;
 use FormsWebhookIntegrator\Api\AnalyticsApiHandler;
 use FormsWebhookIntegrator\Database\DatabaseManager;
+use FormsWebhookIntegrator\Forms\ElementorAtomicFormsBridge;
 use FormsWebhookIntegrator\Forms\ElementorFormsBridge;
 use FormsWebhookIntegrator\Settings\SettingsManager;
 use FormsWebhookIntegrator\Updates\GitHubUpdater;
@@ -62,6 +63,14 @@ final class Plugin
     private readonly ElementorFormsBridge $elementorFormsBridge;
 
     /**
+     * Bridges Elementor Pro Atomic Form submissions to the webhook via a
+     * custom "Actions After Submit" action.
+     *
+     * @var ElementorAtomicFormsBridge
+     */
+    private readonly ElementorAtomicFormsBridge $elementorAtomicFormsBridge;
+
+    /**
      * Schedules and executes background retries for failed webhook deliveries.
      *
      * @var RetryManager
@@ -89,6 +98,12 @@ final class Plugin
         $this->retryManager         = new RetryManager();
         $this->elementorFormsBridge = new ElementorFormsBridge($this->settingsManager, $this->webhookHandler, $this->retryManager);
         $this->analyticsApiHandler  = new AnalyticsApiHandler($this->settingsManager, new WebhookLogger());
+
+        $this->elementorAtomicFormsBridge = new ElementorAtomicFormsBridge(
+            $this->settingsManager,
+            $this->webhookHandler,
+            $this->retryManager
+        );
     }
 
     /**
@@ -152,6 +167,12 @@ final class Plugin
         $this->webhookHandler->register();
         $this->elementorFormsBridge->register();
         $this->analyticsApiHandler->register();
+
+        // Registered unconditionally (not gated on the active flag) so an Atomic
+        // form that already has the fwi-webhook action saved keeps working —
+        // Elementor fails a submission outright on an unregistered action type.
+        // The action itself reports a successful no-op while the integration is off.
+        $this->elementorAtomicFormsBridge->register();
 
         // Registered unconditionally (not gated on the active flag or Elementor
         // presence) so retries queued before a settings change still complete.
