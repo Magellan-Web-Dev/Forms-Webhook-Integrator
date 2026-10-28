@@ -15,8 +15,9 @@ use FormsWebhookIntegrator\Webhook\WebhookHandler;
  * Listens for the elementor_pro/forms/new_record action, extracts the form
  * name and field values from the Elementor record object, then calls
  * WebhookHandler::handleFormSubmission() directly so that the return value
- * can be inspected. If the webhook fails, the Elementor Ajax handler is used
- * to surface an error message in the form UI.
+ * can be inspected. When a failure is not queued for retry, a supplied Elementor
+ * Ajax handler is used to surface an error message in the form UI. Webhook
+ * processing does not require an Ajax handler.
  *
  * Note: handleFormSubmission() is called directly here rather than via
  * do_action('fwi_submission') because WordPress discards action callback
@@ -58,20 +59,25 @@ final class ElementorFormsBridge
      *
      * Extracts the form name and builds a flat associative array of field IDs
      * to raw values. Returns early without calling handleFormSubmission() if the
-     * form name is empty or if the form appears on the excluded-forms list. On
-     * failure the Elementor Ajax handler is used to display the error to the
-     * user and mark the submission as unsuccessful.
+     * form name is empty or if the form appears on the excluded-forms list.
+     * Failed deliveries are queued when retry mode is enabled. Otherwise, on
+     * failure, a supplied Elementor Ajax handler with add_error_message() is
+     * used to display the error and mark the submission as unsuccessful.
+     * Omitting the handler or passing null skips form error reporting without
+     * affecting webhook processing or retry scheduling.
      *
      * @param mixed $record  Elementor_Form_Record instance. Typed as mixed because
      *                       Elementor Pro type declarations are not available at
      *                       plugin load time.
-     * @param mixed $handler Ajax_Handler instance used to attach form error messages
-     *                       and mark the submission as failed. Typed as mixed for the
-     *                       same reason as $record.
+     * @param mixed $handler Optional Elementor Ajax_Handler instance. Defaults to
+     *                       null. Used to attach form error messages and mark the
+     *                       submission as failed. When omitted or null, form error
+     *                       reporting is skipped. Typed as mixed for the same
+     *                       reason as $record.
      *
      * @return void
      */
-    public function handleElementorSubmission(mixed $record, mixed $handler): void
+    public function handleElementorSubmission(mixed $record, mixed $handler = null): void
     {
         $formName = $record->get_form_settings('form_name');
 
@@ -112,7 +118,8 @@ final class ElementorFormsBridge
         // Retry mode: suppress the visitor-facing error only when there are
         // actual failed dispatches to replay. Pre-dispatch rejections (geo-block,
         // inactive, excluded, no URL) have no failed deliveries and still surface
-        // the error. Keyed off failedDeliveries rather than ok because a partial
+        // the error when a compatible Ajax handler is provided.
+        // Keyed off failedDeliveries rather than ok because a partial
         // multi-endpoint failure whose last endpoint succeeded reports ok=true.
         if ($this->settings->getFailureMode() === 'retry' && !empty($result->failedDeliveries)) {
             $this->retryManager->scheduleRetries($result->failedDeliveries);
@@ -120,8 +127,10 @@ final class ElementorFormsBridge
         }
 
         if (!$result->ok) {
-            $handler->add_error_message($result->msg);
-            $handler->is_success = false;
+            if (is_object($handler) && method_exists($handler, 'add_error_message')) {
+                $handler->add_error_message($result->msg);
+                $handler->is_success = false;
+            }
         }
     }
 
